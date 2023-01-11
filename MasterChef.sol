@@ -184,7 +184,7 @@ contract MasterChef is Initializable, PausableUpgradeable, OwnableUpgradeable, U
         return block.number >= user.entranceBlock + pool.rewardLockupBlock;
     }
 
-    // Deposit LP tokens to MasterChef for tEXO allocation with referral.
+    // Deposit LP tokens to MasterChef for USC allocation with referral.
     function deposit(uint256 _pid, uint256 _amount) public nonReentrant whenNotPaused onlyActivePool(_pid) {
         require (_amount > 0, "deposit: amount must be larger than 0");
 
