@@ -3,3 +3,7 @@ node_modules
 cache/
 artifacts/
 .openzeppelin/
+notes.md
+coverage/
+coverage.json
+tmp/

@@ -1,20 +1,22 @@
-const { BigNumber } = require('ethers');
+const { BigNumber } = require("ethers");
+const { SECONDS_A_YEAR } = require("./fixtures_2");
 
-function calculateRewards(_amount, _roiPerYear, _blockDiff, _blocksPerYear) {
-  const blockDiff = BigNumber.from(_blockDiff);
-  const amount = BigNumber.from(_amount);
+function calculateRewards(_roiPerYear, _accumulated, _totalStaked, _timeDiff) {
   const roiPerYear = BigNumber.from(_roiPerYear);
-  const blocksPerYear = BigNumber.from(_blocksPerYear);
+  const accmumulated = BigNumber.from(_accumulated);
+  const totalStaked = BigNumber.from(_totalStaked);
+  const timeDiff = BigNumber.from(_timeDiff);
 
-  return amount.add(
-    amount
-      .mul(roiPerYear)
-      .mul(blockDiff)
-      .div(blocksPerYear)
-      .div(BigNumber.from(10000)),
+  return accmumulated.add(
+    totalStaked.mul(timeDiff).mul(roiPerYear).div(1e4).div(SECONDS_A_YEAR)
   );
+}
+
+function convertDateToSeconds(date) {
+  return Math.round(date.valueOf() / 1000);
 }
 
 module.exports = {
   calculateRewards,
+  convertDateToSeconds,
 };

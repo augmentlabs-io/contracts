@@ -5,7 +5,7 @@ chai.use(chaiAsPromised);
 
 const { loadFixture } = require("@nomicfoundation/hardhat-network-helpers");
 const { expect } = require("chai");
-const { BigNumber } = require("ethers");
+const { BigNumber, ethers } = require("ethers");
 
 const { MINTER_ROLE, PAUSER_ROLE } = require("./fixtures_2");
 const { phase1Fixture } = require("./fixtures_2");
@@ -189,6 +189,13 @@ describe("Upgradable AGC token", function () {
         AGCToken.connect(multisig).mint(account1.address, BigNumber.from(1000))
       ).to.eventually.rejectedWith("Pausable: paused");
 
+      await expect(
+        AGCToken.connect(multisig).burnFrom(
+          account1.address,
+          BigNumber.from(1000)
+        )
+      ).to.eventually.rejectedWith("Pausable: paused");
+
       await expect(AGCToken.connect(multisig).unpause()).to.eventually
         .fulfilled;
 
@@ -224,6 +231,16 @@ describe("Upgradable AGC token", function () {
   });
 
   describe("Security checks", function () {
+    it("throws if mints to company address", async function () {
+      const { AGCToken, multisig, owner } = await loadFixture(phase1Fixture);
+
+      await expect(
+        AGCToken.connect(owner).mint(multisig.address, BigNumber.from(1000))
+      ).to.eventually.rejectedWith(
+        "AGC: company cannot update its own balance"
+      );
+    });
+
     it("should not allow holder to burn", async function () {
       const { AGCToken, account1, initialAGCAmount } = await loadFixture(
         phase1Fixture
@@ -238,7 +255,7 @@ describe("Upgradable AGC token", function () {
 
       await expect(
         AGCToken.connect(account1).burn(BigNumber.from(500))
-      ).to.eventually.rejectedWith("ERC20: burn amount exceeds balance");
+      ).to.eventually.rejectedWith("burn is not allowed");
     });
 
     it("should not allow holder to transfer", async function () {
@@ -257,7 +274,7 @@ describe("Upgradable AGC token", function () {
           account2.address,
           BigNumber.from(500)
         )
-      ).to.eventually.rejectedWith("ERC20: transfer amount exceeds balance");
+      ).to.eventually.rejectedWith("transfer is not allowed");
     });
 
     it("succeeds if multisig tries to mint", async function () {
@@ -289,10 +306,138 @@ describe("Upgradable AGC token", function () {
     });
 
     it("fails if non-owner try to mint", async function () {
-      const { AGCToken, account1, account2 } = await loadFixture(phase1Fixture);
+      const { AGCToken, account1, account2, owner } = await loadFixture(
+        phase1Fixture
+      );
 
       await expect(AGCToken.connect(account1).mint(account2.address, 1000)).to
         .eventually.rejected;
+    });
+
+    it("fails if the owner tries to burn", async function () {
+      const { AGCToken, multisig } = await loadFixture(phase1Fixture);
+
+      await expect(
+        AGCToken.connect(multisig).burn(BigNumber.from(1000))
+      ).to.eventually.rejectedWith("burn is not allowed");
+    });
+
+    it("fails if the deployer tries to burn", async function () {
+      const { AGCToken, owner: deployer } = await loadFixture(phase1Fixture);
+
+      await expect(
+        AGCToken.connect(deployer).burn(BigNumber.from(1000))
+      ).to.eventually.rejectedWith("burn is not allowed");
+    });
+
+    it("fails if owner tries to transfer", async function () {
+      const { AGCToken, multisig, account1 } = await loadFixture(phase1Fixture);
+
+      await expect(
+        AGCToken.connect(multisig).transfer(
+          account1.address,
+          BigNumber.from(1000)
+        )
+      ).to.eventually.rejectedWith("transfer is not allowed");
+    });
+
+    it("fails if deployer tries to transfer", async function () {
+      const {
+        AGCToken,
+        owner: deployer,
+        account1,
+      } = await loadFixture(phase1Fixture);
+
+      await expect(
+        AGCToken.connect(deployer).transfer(
+          account1.address,
+          BigNumber.from(1000)
+        )
+      ).to.eventually.rejectedWith("transfer is not allowed");
+    });
+
+    it("fails if owner tries to transferFrom other user's balance", async function () {
+      const { AGCToken, multisig, account1 } = await loadFixture(phase1Fixture);
+
+      await expect(
+        AGCToken.connect(multisig).transferFrom(
+          account1.address,
+          multisig.address,
+          BigNumber.from(1000)
+        )
+      ).to.eventually.rejectedWith("transferFrom is not allowed");
+    });
+
+    it("fails if deployer tries to transferFrom owner's balance", async function () {
+      const {
+        AGCToken,
+        owner: deployer,
+        multisig: owner,
+      } = await loadFixture(phase1Fixture);
+
+      await expect(
+        AGCToken.connect(deployer).transferFrom(
+          owner.address,
+          deployer.address,
+          BigNumber.from(1000)
+        )
+      ).to.eventually.rejectedWith("transferFrom is not allowed");
+    });
+
+    it("fails if a user tries to transferFrom owner's balance", async function () {
+      const {
+        AGCToken,
+        account1,
+        multisig: owner,
+      } = await loadFixture(phase1Fixture);
+
+      await expect(
+        AGCToken.connect(account1).transferFrom(
+          owner.address,
+          account1.address,
+          BigNumber.from(1000)
+        )
+      ).to.eventually.rejectedWith("transferFrom is not allowed");
+    });
+  });
+
+  describe("errors", function () {
+    it("throws if view balance of zero address", async function () {
+      const { AGCToken, account1, multisig } = await loadFixture(phase1Fixture);
+
+      await expect(
+        AGCToken.balanceOf(ethers.constants.AddressZero)
+      ).to.eventually.rejectedWith("AGC: can not view zero address");
+    });
+
+    it("throws if mint incorrectly", async function () {
+      const { AGCToken, account1, multisig } = await loadFixture(phase1Fixture);
+
+      await expect(
+        AGCToken.connect(multisig).mint(account1.address, 0)
+      ).to.eventually.rejectedWith("AGC: cannot mint zero token");
+
+      await expect(
+        AGCToken.connect(multisig).mint(multisig.address, 1000)
+      ).to.eventually.rejectedWith(
+        "AGC: company cannot update its own balance"
+      );
+    });
+
+    it("throws if burn incorrectly", async function () {
+      const { AGCToken, account1, multisig } = await loadFixture(phase1Fixture);
+
+      await expect(
+        AGCToken.connect(multisig).burnFrom(ethers.constants.AddressZero, 1000)
+      ).to.eventually.rejectedWith("ERC20: burn from zero address");
+
+      await expect(
+        AGCToken.connect(multisig).burnFrom(account1.address, 10000)
+      ).to.eventually.rejectedWith("AGC: insufficient AGC to burn");
+
+      await expect(
+        AGCToken.connect(multisig).burnFrom(ethers.constants.AddressZero, 0)
+      ).to.eventually.rejectedWith("ERC20: burn from zero address");
     });
   });
 });

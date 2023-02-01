@@ -5,6 +5,7 @@ dotenv.config();
 import "tsconfig-paths/register";
 
 import "@nomiclabs/hardhat-ethers";
+import "solidity-coverage";
 import "@nomiclabs/hardhat-etherscan";
 import "@openzeppelin/hardhat-upgrades";
 import { HardhatUserConfig } from "hardhat/types";

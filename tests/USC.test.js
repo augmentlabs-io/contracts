@@ -84,6 +84,39 @@ describe("Upgradable USC token", function () {
   });
 
   describe("Security checks", function () {
+    it("should be able to pause and unpauses by owner", async function () {
+      const { USCToken, multisig, account1, owner, account2 } =
+        await loadFixture(phase1Fixture);
+
+      await expect(USCToken.connect(multisig).pause()).to.eventually.fulfilled;
+
+      await expect(
+        USCToken.connect(multisig).mint(account2.address, 1000)
+      ).to.eventually.rejectedWith("Pausable: paused");
+
+      await expect(
+        USCToken.connect(account2).mint(account2.address, 1000)
+      ).to.eventually.rejectedWith("Pausable: paused");
+
+      await expect(
+        USCToken.connect(account2).unpause()
+      ).to.eventually.rejectedWith("AccessControl:");
+
+      await expect(USCToken.connect(multisig).unpause()).to.eventually
+        .fulfilled;
+
+      await expect(USCToken.connect(multisig).mint(account2.address, 1000)).to
+        .eventually.fulfilled;
+    });
+
+    it("should throw if non-owner tries to pause", async function () {
+      const { USCToken, account1 } = await loadFixture(phase1Fixture);
+
+      await expect(
+        USCToken.connect(account1).pause()
+      ).to.eventually.rejectedWith("AccessControl:");
+    });
+
     it("succeeds if multisig tries to mint", async function () {
       const { USCToken, multisig, account1, initialUSCAmount } =
         await loadFixture(phase1Fixture);
@@ -117,8 +150,9 @@ describe("Upgradable USC token", function () {
     it("fails if non-owner try to mint", async function () {
       const { USCToken, account1, account2 } = await loadFixture(phase1Fixture);
 
-      await expect(USCToken.connect(account1).mint(account2.address, 1000)).to
-        .eventually.rejected;
+      await expect(
+        USCToken.connect(account1).mint(account2.address, 1000)
+      ).to.eventually.rejectedWith("AccessControl:");
     });
   });
 });

@@ -4,7 +4,8 @@
   "description": "",
   "main": "index.js",
   "scripts": {
-    "test": "hardhat compile && hardhat test ./tests/**.test.js"
+    "test": "hardhat compile && hardhat test ./tests/**.test.js",
+    "test:coverage": "hardhat coverage --testfiles \"./tests/**.test.js\""
   },
   "repository": {
     "type": "git",
@@ -26,9 +27,11 @@
     "bignumber.js": "^9.1.1",
     "chai": "^4.3.7",
     "chai-as-promised": "^7.1.1",
+    "dayjs": "^1.11.7",
     "dotenv": "^16.0.3",
     "ethers": "^5.7.2",
     "hardhat": "^2.12.4",
+    "openzeppelin-solidity": "^3.4.2",
     "reflect-metadata": "^0.1.13",
     "rimraf": "^3.0.2",
     "web3": "^1.8.1"
@@ -43,6 +46,7 @@
     "eslint-config-prettier": "^8.3.0",
     "eslint-plugin-prettier": "^4.0.0",
     "prettier": "^2.3.2",
+    "solidity-coverage": "^0.8.2",
     "source-map-support": "^0.5.20",
     "supertest": "^6.1.3",
     "ts-jest": "28.0.8",

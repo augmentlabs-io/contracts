@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: MIT
-pragma solidity ^0.8.9;
+pragma solidity 0.8.9;
 
 import "@openzeppelin/contracts-upgradeable/token/ERC20/ERC20Upgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/token/ERC20/extensions/ERC20BurnableUpgradeable.sol";
@@ -18,7 +18,7 @@ contract USC is Initializable, ERC20Upgradeable, ERC20BurnableUpgradeable, Pausa
         _disableInitializers();
     }
 
-    function initialize() initializer public {
+    function initialize() public initializer {
         __ERC20_init("USC", "USC");
         __ERC20Burnable_init();
         __Pausable_init();
@@ -31,24 +31,16 @@ contract USC is Initializable, ERC20Upgradeable, ERC20BurnableUpgradeable, Pausa
         _grantRole(UPGRADER_ROLE, msg.sender);
     }
 
-    function pause() public onlyRole(PAUSER_ROLE) {
+    function pause() external onlyRole(PAUSER_ROLE) {
         _pause();
     }
 
-    function unpause() public onlyRole(PAUSER_ROLE) {
+    function unpause() external onlyRole(PAUSER_ROLE) {
         _unpause();
     }
 
-    function mint(address to, uint256 amount) public onlyRole(MINTER_ROLE) whenNotPaused {
+    function mint(address to, uint256 amount) external whenNotPaused onlyRole(MINTER_ROLE) {
         _mint(to, amount);
-    }
-
-    function _beforeTokenTransfer(address from, address to, uint256 amount)
-        internal
-        whenNotPaused
-        override
-    {
-        super._beforeTokenTransfer(from, to, amount);
     }
 
     function _authorizeUpgrade(address newImplementation)
