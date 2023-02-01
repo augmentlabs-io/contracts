@@ -8,3 +8,4 @@ This is the repository for the smart contracts for the AugmentLabs Stable Coin (
 ## How to run
 1. Run `yarn install`
 2. Run `npm t` to run the unit tests.
+3. Run `npm run test:coverage` to run testing with coverage.
