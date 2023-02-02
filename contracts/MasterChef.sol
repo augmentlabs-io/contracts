@@ -13,20 +13,30 @@ import "@openzeppelin/contracts-upgradeable/utils/math/SafeMathUpgradeable.sol";
 import "./IERC20MintableUpgradeable.sol";
 import "./USC.sol";
 
+/// @title A contract for staking USDT and earn USC token as rewards over time with fixed yearly ROI.
+/// @author Huy Tran
 contract MasterChef is Initializable, PausableUpgradeable, OwnableUpgradeable, UUPSUpgradeable, ReentrancyGuardUpgradeable {
     using SafeMathUpgradeable for uint256;
     using SafeERC20Upgradeable for IERC20MintableUpgradeable;
 
+    /// @dev Information of each user that participated in the staking process
     struct UserInfo {
         uint256 amount; // How many staking tokens the user has provided.
         uint256 lastRewardTimestamp; // The last block that the reward was paid
         uint256 accumulatedRewards; // The rewards accumulated.
     }
 
+    /// @dev The reward token: USC
     IERC20MintableUpgradeable public USCToken;
+
+    /// @dev The staking token: USDT
     IERC20MintableUpgradeable public USDTToken;
 
+    /// @dev The sum of all USDT staked in the MasterChef
     uint256 public totalStaked;
+
+    /// @dev The ROI per year that each user gets for staking USDT
+    /// @notice ROI per year is fixed and will not be changed
     uint256 public ROIPerYear;
 
     mapping(address => UserInfo) public userInfo;
@@ -41,29 +51,35 @@ contract MasterChef is Initializable, PausableUpgradeable, OwnableUpgradeable, U
         _disableInitializers();
     }
 
+    /// @dev The initialize function for upgradeable smart contract's initialization phase
     function initialize(
-        IERC20MintableUpgradeable _USCToken,
-        IERC20MintableUpgradeable _USDTToken,
+        address _USCToken,
+        address _USDTToken,
         uint256 _roiPerYear
-    ) initializer public {
+    ) external initializer {
+        require(_USCToken != address(0), "usc address must not be empty");
+        require(_USDTToken != address(0), "usdt address must not be empty");
+
         __Pausable_init();
         __Ownable_init();
         __UUPSUpgradeable_init();
 
-        USCToken = _USCToken;
-        USDTToken = _USDTToken;
+        USCToken = IERC20MintableUpgradeable(_USCToken);
+        USDTToken = IERC20MintableUpgradeable(_USDTToken);
         ROIPerYear = _roiPerYear;
     }
 
-    function pause() public onlyOwner {
+    /// @dev Pause the smart contract in case of emergency
+    function pause() external onlyOwner {
         _pause();
     }
 
-    function unpause() public onlyOwner {
+    /// @dev unpause the smart contract when everything is safe
+    function unpause() external onlyOwner {
         _unpause();
     }
 
-    // View function to see USC rewards.
+    /// @dev View function to see USC rewards of an address.
     function earnedUSC(address _userAddress) public view returns (uint256) {
         UserInfo storage user = userInfo[_userAddress];
 
@@ -76,7 +92,8 @@ contract MasterChef is Initializable, PausableUpgradeable, OwnableUpgradeable, U
         return totalRewards;
     }
 
-    // Deposit USDT tokens to MasterChef for USC allocation.
+    /// @dev Deposit USDT tokens to MasterChef for USC allocation.
+    /// @notice When the contract is paused, this function will not work as a safety mechanism for new users.
     function deposit(uint256 _amount) public whenNotPaused nonReentrant updateReward() {
         require (_amount > 0, "deposit: amount must be larger than 0");
 
@@ -90,8 +107,9 @@ contract MasterChef is Initializable, PausableUpgradeable, OwnableUpgradeable, U
         emit Deposit(msg.sender, _amount);
     }
 
-    // Withdraw LP tokens from MasterChef.
-    function withdraw(uint256 _amount) public whenNotPaused nonReentrant updateReward() {
+    /// @dev Withdraw USDT tokens from MasterChef.
+    /// @notice This function will work regardless of the pausing status to protect user's interest.
+    function withdraw(uint256 _amount) public nonReentrant updateReward() {
         require(_amount > 0, "withdraw: cannot withdraw 0");
 
         UserInfo storage user = userInfo[msg.sender];
@@ -105,6 +123,7 @@ contract MasterChef is Initializable, PausableUpgradeable, OwnableUpgradeable, U
         emit Withdrawn(msg.sender, _amount);
     }
 
+    /// @dev Withdraw the USC rewards that a user has accumulated over time.
     function getReward() public whenNotPaused nonReentrant updateReward() {
         UserInfo storage user = userInfo[msg.sender];
 
@@ -124,7 +143,7 @@ contract MasterChef is Initializable, PausableUpgradeable, OwnableUpgradeable, U
         emit RewardPaid(msg.sender, rewardAmount);
     }
 
-    function _authorizeUpgrade(address newImplementation)
+    function _authorizeUpgrade(address)
         internal
         onlyOwner
         override

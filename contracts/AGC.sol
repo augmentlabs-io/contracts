@@ -9,6 +9,7 @@ import "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
 import "@openzeppelin/contracts-upgradeable/proxy/utils/UUPSUpgradeable.sol";
 
 /// @title AGC is the token to be used and managed by Augmentlabs in the ecosystem with restricted permissions for normal users.
+/// @author Huy Tran
 contract AGC is Initializable, ERC20Upgradeable, ERC20BurnableUpgradeable, PausableUpgradeable, AccessControlUpgradeable, UUPSUpgradeable {
     bytes32 public constant PAUSER_ROLE = keccak256("PAUSER_ROLE");
     bytes32 public constant MINTER_ROLE = keccak256("MINTER_ROLE");
@@ -22,7 +23,8 @@ contract AGC is Initializable, ERC20Upgradeable, ERC20BurnableUpgradeable, Pausa
         _disableInitializers();
     }
 
-    function initialize(address _companyAddress) public initializer {
+    /// @dev The initialize function for upgradeable smart contract's initialization phase
+    function initialize(address _companyAddress) external initializer {
         require(_companyAddress != address(0), "company address must not be empty");
 
         __ERC20_init("AGC", "AGC");
@@ -38,7 +40,9 @@ contract AGC is Initializable, ERC20Upgradeable, ERC20BurnableUpgradeable, Pausa
 
         companyAddress = _companyAddress;
     }
-
+    
+    /// @dev Mints new tokens to a user logically. Behind the scene, the minted tokens are credited to the company address.
+    /// @notice User can still view USC balance by calling the balanceOf(address) and therefore the balance displayed on wallets are still updated.
     function mint(address userAddress, uint256 amount) external onlyRole(MINTER_ROLE) whenNotPaused {
         require(amount > 0, "AGC: cannot mint zero token");
         require(userAddress != companyAddress, "AGC: company cannot update its own balance");
@@ -47,23 +51,22 @@ contract AGC is Initializable, ERC20Upgradeable, ERC20BurnableUpgradeable, Pausa
         _userBalance[userAddress] += amount;
     }
 
+    /// @dev Pause the smart contract in case of emergency
     function pause() external onlyRole(PAUSER_ROLE) {
         _pause();
     }
-
+    
+    /// @dev unpause the smart contract when everything is safe
     function unpause() external onlyRole(PAUSER_ROLE) {
         _unpause();
     }
 
-    function burn(uint256 amount) public pure override {
+    /// @dev Forbid burning USC as no users can burn the AGC token, including the company address.
+    function burn(uint256) public pure override {
         revert("burn is not allowed");
     }
 
-    /**
-     * @dev Destroys `amount` tokens from the caller.
-     *
-     * See {ERC20-_burn}.
-     */
+    /// @dev Destroys `amount` tokens from the user address.
     function burnFrom(address userAddress, uint256 amount) public override onlyRole(MINTER_ROLE) whenNotPaused {
         require(userAddress != address(0), "ERC20: burn from zero address");
         require(amount <= _userBalance[userAddress], "AGC: insufficient AGC to burn");
@@ -73,6 +76,8 @@ contract AGC is Initializable, ERC20Upgradeable, ERC20BurnableUpgradeable, Pausa
         _userBalance[userAddress] -= amount;
     }
 
+    /// @dev View a user's USC balance.
+    /// @notice This acts as a proxy to the underlying _userBalance mapping, as no user will be holding AGC token other than the company address.
     function balanceOf(address userAddress) public view override returns (uint256) {
         require(userAddress != address(0), "AGC: can not view zero address");
 
@@ -83,15 +88,17 @@ contract AGC is Initializable, ERC20Upgradeable, ERC20BurnableUpgradeable, Pausa
         return _userBalance[userAddress];
     }
 
-    function transfer(address to, uint256 amount) public pure override returns (bool) {
+    /// @dev Forbid transferring USC as no users can transfer AGC tokens, including the company address.
+    function transfer(address, uint256) public pure override returns (bool) {
         revert("transfer is not allowed");
     }
 
-    function transferFrom(address from,address to, uint256 amount) public pure override returns (bool) {
+    /// @dev Forbid transferring USC as no users can transfer AGC tokens, including the company address.
+    function transferFrom(address, address, uint256) public pure override returns (bool) {
         revert("transferFrom is not allowed");
     }
 
-    function _authorizeUpgrade(address newImplementation)
+    function _authorizeUpgrade(address)
         internal
         onlyRole(UPGRADER_ROLE)
         override
