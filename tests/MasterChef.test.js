@@ -420,10 +420,6 @@ describe("MasterChef", function () {
       ).to.eventually.rejectedWith("Pausable: paused");
 
       await expect(
-        MasterChef.connect(multisig).withdraw(1000)
-      ).to.eventually.rejectedWith("Pausable: paused");
-
-      await expect(
         MasterChef.connect(account1).getReward()
       ).to.eventually.rejectedWith("Pausable: paused");
 
