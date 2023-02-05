@@ -8,7 +8,6 @@ import "@openzeppelin/contracts-upgradeable/proxy/utils/UUPSUpgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/security/ReentrancyGuardUpgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/token/ERC20/IERC20Upgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/token/ERC20/utils/SafeERC20Upgradeable.sol";
-import "@openzeppelin/contracts-upgradeable/utils/math/SafeMathUpgradeable.sol";
 
 import "./IERC20MintableUpgradeable.sol";
 import "./USC.sol";
@@ -16,7 +15,6 @@ import "./USC.sol";
 /// @title A contract for staking USDT and earn USC token as rewards over time with fixed yearly ROI.
 /// @author Huy Tran
 contract MasterChef is Initializable, PausableUpgradeable, OwnableUpgradeable, UUPSUpgradeable, ReentrancyGuardUpgradeable {
-    using SafeMathUpgradeable for uint256;
     using SafeERC20Upgradeable for IERC20MintableUpgradeable;
 
     /// @dev Information of each user that participated in the staking process
@@ -85,9 +83,9 @@ contract MasterChef is Initializable, PausableUpgradeable, OwnableUpgradeable, U
 
         uint256 secondsInAYear = 365 days;
         uint256 timeDiff = block.timestamp - user.lastRewardTimestamp; // timediff in seconds
-        uint256 newRewards = user.amount.mul(ROIPerYear).mul(timeDiff).div(secondsInAYear).div(1e4);
+        uint256 newRewards = user.amount * ROIPerYear * timeDiff / (secondsInAYear * 1e4);
 
-        uint256 totalRewards = user.accumulatedRewards.add(newRewards);
+        uint256 totalRewards = user.accumulatedRewards + newRewards;
 
         return totalRewards;
     }
@@ -101,8 +99,8 @@ contract MasterChef is Initializable, PausableUpgradeable, OwnableUpgradeable, U
 
         USDTToken.safeTransferFrom(msg.sender, address(this), _amount);
 
-        user.amount = user.amount.add(_amount);
-        totalStaked = totalStaked.add(_amount);
+        user.amount += _amount;
+        totalStaked += totalStaked + _amount;
 
         emit Deposit(msg.sender, _amount);
     }
@@ -115,8 +113,8 @@ contract MasterChef is Initializable, PausableUpgradeable, OwnableUpgradeable, U
         UserInfo storage user = userInfo[msg.sender];
         require(user.amount >= _amount, "withdraw: amount exceeds balance");
 
-        user.amount = user.amount.sub(_amount);
-        totalStaked = totalStaked.sub(_amount);
+        user.amount -= _amount;
+        totalStaked -= _amount;
 
         USDTToken.safeTransfer(msg.sender, _amount);
 
@@ -128,19 +126,17 @@ contract MasterChef is Initializable, PausableUpgradeable, OwnableUpgradeable, U
         UserInfo storage user = userInfo[msg.sender];
 
         uint256 rewardAmount = user.accumulatedRewards;
-        if (rewardAmount == 0) {
-            return;
+        if (rewardAmount > 0) {
+            user.accumulatedRewards = 0;
+
+            // Mint USC tokens to pay for reward
+            USCToken.mint(address(this), rewardAmount);
+
+            // Send rewards
+            USCToken.safeTransfer(msg.sender, rewardAmount);
+
+            emit RewardPaid(msg.sender, rewardAmount);
         }
-
-        user.accumulatedRewards = 0;
-
-        // Mint USC tokens to pay for reward
-        USCToken.mint(address(this), rewardAmount);
-
-        // Send rewards
-        USCToken.safeTransfer(msg.sender, rewardAmount);
-
-        emit RewardPaid(msg.sender, rewardAmount);
     }
 
     function _authorizeUpgrade(address)
