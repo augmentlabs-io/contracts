@@ -15,7 +15,7 @@ contract AGC is Initializable, ERC20Upgradeable, ERC20BurnableUpgradeable, Pausa
     bytes32 public constant MINTER_ROLE = keccak256("MINTER_ROLE");
     bytes32 public constant UPGRADER_ROLE = keccak256("UPGRADER_ROLE");
 
-    address private companyAddress;
+    address public companyAddress;
     mapping (address => uint256) private _userBalance;
 
     /// @custom:oz-upgrades-unsafe-allow constructor
