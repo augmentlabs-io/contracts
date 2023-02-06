@@ -24,6 +24,7 @@ contract AGC is Initializable, ERC20Upgradeable, ERC20BurnableUpgradeable, Pausa
     }
 
     /// @dev The initialize function for upgradeable smart contract's initialization phase
+    /// @param _companyAddress is the address that is the actual holder of all AGC supply.
     function initialize(address _companyAddress) external initializer {
         require(_companyAddress != address(0), "company address must not be empty");
 
@@ -67,6 +68,7 @@ contract AGC is Initializable, ERC20Upgradeable, ERC20BurnableUpgradeable, Pausa
     }
 
     /// @dev Destroys `amount` tokens from the user address.
+    /// @notice The actual address to burn is the companyAddress. We just logically reduce the userAddress's balance by performing a mathematical substraction.
     function burnFrom(address userAddress, uint256 amount) public override onlyRole(MINTER_ROLE) whenNotPaused {
         require(userAddress != address(0), "ERC20: burn from zero address");
         require(amount <= _userBalance[userAddress], "AGC: insufficient AGC to burn");
