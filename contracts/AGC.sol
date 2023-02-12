@@ -126,8 +126,10 @@ contract AGC is Initializable, ERC20Upgradeable, ERC20BurnableUpgradeable, Pausa
 
     /// @dev Logically deduct a certain amount of AGC from user's balance and credit that amount to company balance.
     /// @notice This happens when user makes a purchase. Only logical AGC tokens are transferred.
+    /// Can't deduct from company address
     function deductFrom(address fromUser, uint256 amount) external onlyRole(OPERATOR_ROLE) whenNotPaused returns (bool) {
         require(fromUser != address(0), "deductFrom: source address can not be zero");
+        require(fromUser != companyAddress, "deductFrom: source address can not be company address");
         require(amount > 0, "deductFrom: cannot transfer zero token");
         require(_userBalances[fromUser] >= amount, "deductFrom: insufficient user balance");
 
@@ -151,8 +153,8 @@ contract AGC is Initializable, ERC20Upgradeable, ERC20BurnableUpgradeable, Pausa
     }
 
     /// @dev Destroys an amount of AGC tokens from the user address.
-    /// @notice The actual address to burn is the companyAddress. We just logically reduce the userAddress's balance by performing a mathematical substraction.
-    /// Cannot burn from company address.
+    /// @notice The actual address to burn in ERC20 internal is the companyAddress. We just logically reduce the userAddress's balance by performing a mathematical substraction.
+    /// Cannot burnFrom using company address.
     function burnFrom(address _userAddress, uint256 _amount) public override onlyRole(OPERATOR_ROLE) whenNotPaused {
         require(_userAddress != address(0), "ERC20: burn from zero address");
         require(_userAddress != companyAddress, "burnFrom: user address must not be company address");
@@ -168,7 +170,7 @@ contract AGC is Initializable, ERC20Upgradeable, ERC20BurnableUpgradeable, Pausa
 
     /// @dev Logically transfer AGC from company balance to a user.
     /// @notice No user can transfer AGC to another user. We only transfer from company to a user.
-    /// The inner company AGC balance still intact, we're just logically record the balance changes.
+    /// The inner company's AGC balance still intact, we're just logically record the balance changes.
     function transfer(address _toUser, uint256 _amount) public override onlyRole(OPERATOR_ROLE) whenNotPaused updateUserAddress(_toUser) returns (bool) {
         require(_toUser != address(0), "transfer: cannot transfer to zero address");
         require(_toUser != companyAddress, "transfer: cannot transfer to companyAddress");
@@ -183,7 +185,6 @@ contract AGC is Initializable, ERC20Upgradeable, ERC20BurnableUpgradeable, Pausa
 
     /// @dev Burn the company balance and reduce totalSupply.
     /// @notice Only the company can burn its AGC. Does not affect other user's AGC balance.
-    /// This will reduce total supply.
     function burn(uint256 _amount) public override onlyRole(OPERATOR_ROLE) whenNotPaused {
         require(_amount > 0, "burn: cannot burn zero amount");
         require(_amount <= _userBalances[companyAddress], "burn: insufficient company balance");
@@ -203,7 +204,7 @@ contract AGC is Initializable, ERC20Upgradeable, ERC20BurnableUpgradeable, Pausa
         return _userBalances[userAddress];
     }
 
-    /// @dev returns total count of AGC holders
+    /// @dev returns total count of AGC holders.
     function countAllUsers() public view returns (uint256) {
         return _users.length;
     }

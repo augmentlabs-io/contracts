@@ -32,17 +32,8 @@ async function phase1Fixture() {
 
   const _AGCToken = await ethers.getContractFactory("AGC");
   const _USCToken = await ethers.getContractFactory("USC");
-  const _USDTToken = await ethers.getContractFactory("USDT");
   const _TokenController = await ethers.getContractFactory("TokenController");
   const _MasterChef = await ethers.getContractFactory("MasterChef");
-
-  // For testing only. Deploy UST
-  const USDTToken = await upgrades.deployProxy(_USDTToken, [], {
-    initializer: "initialize",
-    kind: "uups",
-  });
-
-  await USDTToken.deployed();
 
   // Deploy AGC Token
   const AGCToken = await upgrades.deployProxy(
@@ -143,7 +134,6 @@ async function phase1Fixture() {
     account2: accounts[2],
     multisig: multisigAccount,
     initialCompanyAGCAmount,
-    USDTToken,
     MasterChef,
     ROIPerYear,
   };

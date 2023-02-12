@@ -25,16 +25,17 @@ contract MasterChef is Initializable, PausableUpgradeable, OwnableUpgradeable, U
     /// @dev The USC Token
     IERC20MintableUpgradeable public uscToken;
 
-    /// @dev The sum of all USDT staked in the MasterChef
+    /// @dev The sum of all USC staked in the MasterChef
     uint256 public totalStaked;
 
     /// @dev the minimum ROI per year
     uint256 public minROIPerYear;
 
-    /// @dev The ROI per year that each user gets for staking USDT
-    /// @notice ROI per year is fixed and will not be changed
+    /// @dev The ROI per year that each user gets for staking USC
+    /// @notice ROI per year can be changed but not less than initial minimum 
     uint256 public roiPerYear;
 
+    /// @dev mapping to save user staking info by user address
     mapping(address => UserInfo) public userInfo;
 
     /* ========== EVENTS ========== */
@@ -76,7 +77,7 @@ contract MasterChef is Initializable, PausableUpgradeable, OwnableUpgradeable, U
     }
 
     /// @dev Sets the new ROI per year
-    /// @notice the new ROI per year must not be less than the initial ROI to protect the users
+    /// @notice the new ROI per year must not be less than the initial ROI to protect the users from any risks
     function setROIPerYear(uint256 _newROIPerYear) external onlyOwner {
         require(_newROIPerYear >= minROIPerYear, "setROIPerYear: new ROI must not be less than minimum");
 

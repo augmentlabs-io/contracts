@@ -1020,6 +1020,23 @@ describe("Upgradable AGC token", function () {
           ).to.eventually.rejectedWith(PAUSED_MSG);
         });
 
+        it("throws if deduct from company address", async function () {
+          const {
+            AGCToken,
+            owner: apiBackend,
+            multisig: companyAccount,
+          } = await loadFixture(phase1Fixture);
+
+          await expect(
+            AGCToken.connect(apiBackend).deductFrom(
+              companyAccount.address,
+              1000
+            )
+          ).to.eventually.rejectedWith(
+            "deductFrom: source address can not be company address"
+          );
+        });
+
         it("throws if deduct zero address", async function () {
           const { AGCToken, owner: apiBackend } = await loadFixture(
             phase1Fixture
