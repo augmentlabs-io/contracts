@@ -12,22 +12,86 @@ const { expect } = require("chai");
 const { BigNumber, constants } = require("ethers");
 const Dayjs = require("dayjs");
 
-const { calculateRewards } = require("./helpers");
+const {
+  calculateRewards,
+  mintSomeUSCToAccount,
+  defaultMintAmount,
+} = require("./helpers");
 const {
   phase1Fixture,
   MINTER_ROLE,
   SECONDS_A_YEAR,
   MAX_UINT_256,
-} = require("./fixtures_2");
+  PAUSED_MSG,
+  OWNABLE_MSG,
+} = require("./fixtures");
 
 describe("MasterChef", function () {
   describe("general info test", function () {
     it("should have correct initializer numbers", async function () {
       const { MasterChef, ROIPerYear } = await loadFixture(phase1Fixture);
 
-      expect(
-        (await MasterChef.ROIPerYear()).eq(BigNumber.from(ROIPerYear))
-      ).to.be.equal(true, "roi per year should be saved correctly");
+      const currentROIPerYear = await MasterChef.roiPerYear();
+
+      expect(currentROIPerYear.eq(BigNumber.from(ROIPerYear))).to.be.equal(
+        true,
+        "roi per year should be saved correctly"
+      );
+    });
+  });
+
+  describe("set roi per year", function () {
+    describe("happy path", function () {
+      it("should use initial ROI as min ROI", async function () {
+        const { MasterChef, ROIPerYear } = await loadFixture(phase1Fixture);
+
+        const minROI = await MasterChef.minROIPerYear();
+
+        expect(minROI.eq(ROIPerYear)).to.be.eq(
+          true,
+          "initial ROI should be min ROI"
+        );
+      });
+
+      it("should set new roi successfully", async function () {
+        const { MasterChef, multisig: companyAccount } = await loadFixture(
+          phase1Fixture
+        );
+
+        const newROI = 2000; // 20%
+        await MasterChef.connect(companyAccount).setROIPerYear(newROI);
+
+        const currentROI = await MasterChef.roiPerYear();
+
+        expect(currentROI.eq(BigNumber.from(newROI))).to.be.eq(
+          true,
+          "should set new ROI successfully"
+        );
+      });
+    });
+
+    describe("error cases", function () {
+      it("throws if new ROI is less than min ROI", async function () {
+        const { MasterChef, multisig: companyAccount } = await loadFixture(
+          phase1Fixture
+        );
+
+        const newROI = 500; // 5%
+        await expect(
+          MasterChef.connect(companyAccount).setROIPerYear(newROI)
+        ).to.eventually.rejectedWith(
+          "setROIPerYear: new ROI must not be less than minimum"
+        );
+      });
+
+      it("throws if user tries to update ROI", async function () {
+        const { MasterChef, account1 } = await loadFixture(phase1Fixture);
+
+        const newROI = 2000; // 20%
+        await expect(
+          MasterChef.connect(account1).setROIPerYear(newROI)
+        ).to.eventually.rejectedWith(OWNABLE_MSG);
+      });
     });
   });
 
@@ -43,15 +107,24 @@ describe("MasterChef", function () {
     });
 
     it("should record lp token correctly", async function () {
-      const { MasterChef, USDTToken, account1, initialUSTAmount } =
-        await loadFixture(phase1Fixture);
+      const {
+        MasterChef,
+        USCToken,
+        account1,
+        owner: apiBackend,
+      } = await loadFixture(phase1Fixture);
 
       await expect(
-        USDTToken.connect(account1).approve(
+        USCToken.connect(account1).approve(
           MasterChef.address,
           constants.MaxUint256
         )
       ).to.eventually.fulfilled;
+
+      await mintSomeUSCToAccount(USCToken, {
+        minter: apiBackend,
+        account: account1,
+      });
 
       const depositAmount = BigNumber.from(500);
 
@@ -65,23 +138,32 @@ describe("MasterChef", function () {
         "account 1 should have lp token recorded correctly"
       );
 
-      const userUSDTAfterDeposit = await USDTToken.balanceOf(account1.address);
+      const userUSCAfterDeposit = await USCToken.balanceOf(account1.address);
 
       expect(
-        userUSDTAfterDeposit.eq(initialUSTAmount.sub(depositAmount))
+        userUSCAfterDeposit.eq(defaultMintAmount.sub(depositAmount))
       ).to.be.equal(true, "user should have balance subtracted correctly");
     });
 
     it("should yield ROI in a short period correctly", async function () {
-      const { MasterChef, owner, account2, USDTToken, ROIPerYear, USCToken } =
-        await loadFixture(phase1Fixture);
+      const {
+        MasterChef,
+        owner: apiBackend,
+        account2,
+        ROIPerYear,
+        USCToken,
+      } = await loadFixture(phase1Fixture);
 
       const mintAmount = BigNumber.from(3000);
       const depositAmount = BigNumber.from(2000);
 
-      await USDTToken.connect(owner).mint(account2.address, mintAmount);
+      await mintSomeUSCToAccount(USCToken, {
+        minter: apiBackend,
+        account: account2,
+        mintAmount,
+      });
 
-      await USDTToken.connect(account2).approve(
+      await USCToken.connect(account2).approve(
         MasterChef.address,
         constants.MaxUint256
       );
@@ -146,25 +228,27 @@ describe("MasterChef", function () {
         true,
         "user should have been rewarded USC correctly"
       );
-
-      const userUSDTBalance = await USDTToken.balanceOf(account2.address);
-
-      expect(userUSDTBalance.eq(mintAmount)).to.be.equal(
-        true,
-        "user should have been refunded correctly"
-      );
     });
 
     it("should yield ROI with multiple stakes correctly", async function () {
-      const { MasterChef, owner, account2, USDTToken, ROIPerYear } =
-        await loadFixture(phase1Fixture);
+      const {
+        MasterChef,
+        owner: apiBackend,
+        account2,
+        ROIPerYear,
+        USCToken,
+      } = await loadFixture(phase1Fixture);
 
       const mintAmount = BigNumber.from(3000);
       const depositAmount = BigNumber.from(2000);
 
-      await USDTToken.connect(owner).mint(account2.address, mintAmount);
+      await mintSomeUSCToAccount(USCToken, {
+        minter: apiBackend,
+        account: account2,
+        mintAmount,
+      });
 
-      await USDTToken.connect(account2).approve(
+      await USCToken.connect(account2).approve(
         MasterChef.address,
         constants.MaxUint256
       );
@@ -207,16 +291,114 @@ describe("MasterChef", function () {
       );
     });
 
+    it("should yield ROI with multiple users correctly", async function () {
+      const {
+        MasterChef,
+        owner: apiBackend,
+        account1,
+        account2,
+        ROIPerYear,
+        USCToken,
+      } = await loadFixture(phase1Fixture);
+
+      const mintAmount = BigNumber.from(3000);
+
+      await mintSomeUSCToAccount(USCToken, {
+        minter: apiBackend,
+        account: account1,
+        mintAmount,
+      });
+
+      await mintSomeUSCToAccount(USCToken, {
+        minter: apiBackend,
+        account: account2,
+        mintAmount,
+      });
+
+      await USCToken.connect(account1).approve(
+        MasterChef.address,
+        constants.MaxUint256
+      );
+
+      await USCToken.connect(account2).approve(
+        MasterChef.address,
+        constants.MaxUint256
+      );
+
+      // deposit 1000 out of 3000 minted
+      await expect(MasterChef.connect(account1).deposit(BigNumber.from(1000)))
+        .to.eventually.fulfilled;
+
+      // deposit 2000 out of 3000 minted
+      await expect(MasterChef.connect(account2).deposit(BigNumber.from(2000)))
+        .to.eventually.fulfilled;
+
+      const currentTz = await time.latest();
+      const now = new Dayjs(currentTz * 1000);
+
+      // 3/5 year has passed by from deposit date...
+      await time.setNextBlockTimestamp(now.add(73 * 3, "day").toDate());
+
+      await mine(1);
+
+      // deposit the rest of the money: 2000 for account1
+      await expect(MasterChef.connect(account1).deposit(BigNumber.from(2000)))
+        .to.eventually.fulfilled;
+
+      // deposit the rest of the money: 1000 for account2
+      await expect(MasterChef.connect(account2).deposit(BigNumber.from(1000)))
+        .to.eventually.fulfilled;
+
+      // 2/5 year has passed by from deposit date...
+      await time.setNextBlockTimestamp(
+        now.add(365, "day").add(1, "minute").toDate()
+      );
+
+      await mine(1);
+
+      const account1PendingUSC = await MasterChef.earnedUSC(account1.address);
+      const account2PendingUSC = await MasterChef.earnedUSC(account2.address);
+
+      const account1CorrectRewards = calculateRewards(
+        ROIPerYear,
+        120,
+        mintAmount,
+        (SECONDS_A_YEAR * 2) / 5
+      );
+
+      const account2CorrectRewards = calculateRewards(
+        ROIPerYear,
+        240,
+        mintAmount,
+        (SECONDS_A_YEAR * 2) / 5
+      );
+
+      expect(account1PendingUSC.eq(account1CorrectRewards)).to.be.equal(
+        true,
+        "account1 should have correct USC rewards"
+      );
+
+      expect(account2PendingUSC.eq(account2CorrectRewards)).to.be.equal(
+        true,
+        "account2 should have correct USC rewards"
+      );
+    });
+
     it("should yield ROI if user withdraws partially correctly", async function () {
-      const { MasterChef, owner, account2, USDTToken, ROIPerYear } =
-        await loadFixture(phase1Fixture);
+      const {
+        MasterChef,
+        owner: apiBackend,
+        account2,
+        ROIPerYear,
+        USCToken,
+      } = await loadFixture(phase1Fixture);
 
       const mintAmount = BigNumber.from(3000);
       const depositAmount = BigNumber.from(2000);
 
-      await USDTToken.connect(owner).mint(account2.address, mintAmount);
+      await USCToken.connect(apiBackend).mint(account2.address, mintAmount);
 
-      await USDTToken.connect(account2).approve(
+      await USCToken.connect(account2).approve(
         MasterChef.address,
         constants.MaxUint256
       );
@@ -237,8 +419,8 @@ describe("MasterChef", function () {
       await expect(MasterChef.connect(account2).withdraw(BigNumber.from(1000)))
         .to.eventually.fulfilled;
 
-      const userUSDTBalance = await USDTToken.balanceOf(account2.address);
-      expect(userUSDTBalance.eq(BigNumber.from(2000))).to.be.equal(
+      const userUSCBalance = await USCToken.balanceOf(account2.address);
+      expect(userUSCBalance.eq(BigNumber.from(2000))).to.be.equal(
         true,
         "user should withdraw successfully"
       );
@@ -265,11 +447,11 @@ describe("MasterChef", function () {
     });
 
     it("should give 0 rewards if user has not staked yet", async function () {
-      const { MasterChef, account2, USDTToken, USCToken } = await loadFixture(
+      const { MasterChef, account2, USCToken } = await loadFixture(
         phase1Fixture
       );
 
-      await USDTToken.connect(account2).approve(
+      await USCToken.connect(account2).approve(
         MasterChef.address,
         MAX_UINT_256
       );
@@ -293,15 +475,20 @@ describe("MasterChef", function () {
     });
 
     it("should give rewards intact if user withdraw all tokens", async function () {
-      const { MasterChef, owner, account2, USDTToken, ROIPerYear } =
-        await loadFixture(phase1Fixture);
+      const {
+        MasterChef,
+        owner: apiBackend,
+        account2,
+        ROIPerYear,
+        USCToken,
+      } = await loadFixture(phase1Fixture);
 
       const mintAmount = BigNumber.from(3000);
       const depositAmount = BigNumber.from(2000);
 
-      await USDTToken.connect(owner).mint(account2.address, mintAmount);
+      await USCToken.connect(apiBackend).mint(account2.address, mintAmount);
 
-      await USDTToken.connect(account2).approve(
+      await USCToken.connect(account2).approve(
         MasterChef.address,
         constants.MaxUint256
       );
@@ -322,8 +509,8 @@ describe("MasterChef", function () {
       await expect(MasterChef.connect(account2).withdraw(depositAmount)).to
         .eventually.fulfilled;
 
-      const userUSDTBalance = await USDTToken.balanceOf(account2.address);
-      expect(userUSDTBalance.eq(mintAmount)).to.be.equal(
+      const userUSCBalance = await USCToken.balanceOf(account2.address);
+      expect(userUSCBalance.eq(mintAmount)).to.be.equal(
         true,
         "user should withdraw successfully"
       );
@@ -408,32 +595,40 @@ describe("MasterChef", function () {
 
   describe("security", function () {
     it("should be able to pause and unpauses by owner", async function () {
-      const { MasterChef, multisig, account1, USDTToken } = await loadFixture(
-        phase1Fixture
-      );
+      const {
+        MasterChef,
+        multisig: companyAccount,
+        account1,
+        USCToken,
+      } = await loadFixture(phase1Fixture);
 
-      await expect(MasterChef.connect(multisig).pause()).to.eventually
+      await expect(MasterChef.connect(companyAccount).pause()).to.eventually
         .fulfilled;
 
       await expect(
-        MasterChef.connect(multisig).deposit(1000)
-      ).to.eventually.rejectedWith("Pausable: paused");
+        MasterChef.connect(companyAccount).deposit(1000)
+      ).to.eventually.rejectedWith(PAUSED_MSG);
 
       await expect(
         MasterChef.connect(account1).getReward()
-      ).to.eventually.rejectedWith("Pausable: paused");
+      ).to.eventually.rejectedWith(PAUSED_MSG);
 
       await expect(
         MasterChef.connect(account1).unpause()
-      ).to.eventually.rejectedWith("Ownable: caller is not the owner");
+      ).to.eventually.rejectedWith(OWNABLE_MSG);
 
-      await expect(MasterChef.connect(multisig).unpause()).to.eventually
+      await expect(MasterChef.connect(companyAccount).unpause()).to.eventually
         .fulfilled;
 
-      await USDTToken.connect(account1).approve(
+      await USCToken.connect(account1).approve(
         MasterChef.address,
         MAX_UINT_256
       );
+
+      await mintSomeUSCToAccount(USCToken, {
+        minter: companyAccount,
+        account: account1,
+      });
 
       await expect(MasterChef.connect(account1).deposit(1000)).to.eventually
         .fulfilled;
@@ -480,11 +675,11 @@ describe("MasterChef", function () {
     });
 
     it("should throw if user has insufficient balance", async function () {
-      const { MasterChef, owner, account2, USDTToken } = await loadFixture(
+      const { MasterChef, owner, account2, USCToken } = await loadFixture(
         phase1Fixture
       );
 
-      await USDTToken.connect(account2).approve(
+      await USCToken.connect(account2).approve(
         MasterChef.address,
         MAX_UINT_256
       );
@@ -503,14 +698,14 @@ describe("MasterChef", function () {
     });
 
     it("should throw error if user has not approved yet", async function () {
-      const { MasterChef, owner, account2, USDTToken } = await loadFixture(
+      const { MasterChef, owner, account2, USCToken } = await loadFixture(
         phase1Fixture
       );
 
       const mintAmount = BigNumber.from(3000);
       const depositAmount = BigNumber.from(2000);
 
-      await USDTToken.connect(owner).mint(account2.address, mintAmount);
+      await USCToken.connect(owner).mint(account2.address, mintAmount);
 
       await expect(
         MasterChef.connect(account2).deposit(depositAmount)
@@ -518,7 +713,7 @@ describe("MasterChef", function () {
     });
 
     it("should throw if user withdraw more than balance", async function () {
-      const { MasterChef, owner, account2, USDTToken } = await loadFixture(
+      const { MasterChef, owner, account2, USCToken } = await loadFixture(
         phase1Fixture
       );
 
@@ -526,9 +721,9 @@ describe("MasterChef", function () {
       const depositAmount = BigNumber.from(2000);
       const withdrawAmount = BigNumber.from(5000);
 
-      await USDTToken.connect(owner).mint(account2.address, mintAmount);
+      await USCToken.connect(owner).mint(account2.address, mintAmount);
 
-      await USDTToken.connect(account2).approve(
+      await USCToken.connect(account2).approve(
         MasterChef.address,
         constants.MaxUint256
       );

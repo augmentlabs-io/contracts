@@ -6,33 +6,46 @@ chai.use(chaiAsPromised);
 const { loadFixture } = require("@nomicfoundation/hardhat-network-helpers");
 const { expect } = require("chai");
 const { BigNumber } = require("ethers");
-
-const { phase1Fixture, REDEEMER_ROLE, MAX_UINT_256 } = require("./fixtures_2");
 const { ethers } = require("hardhat");
+
+const { phase1Fixture, REDEEMER_ROLE, MAX_UINT_256 } = require("./fixtures");
+const {
+  mintSomeAGCToAccount,
+  defaultMintAmount,
+  mintSomeUSCToAccount,
+} = require("./helpers");
 
 describe("Token Controller", function () {
   describe("Happy path", function () {
-    it("should redeem AGC using owner account correctly", async function () {
+    it("should redeem AGC using apiBackend account correctly", async function () {
       const {
         tokenController,
-        owner,
+        owner: apiBackend,
         account1,
         AGCToken,
         USCToken,
-        initialAGCAmount,
-        initialUSCAmount,
       } = await loadFixture(phase1Fixture);
+
+      await mintSomeAGCToAccount(AGCToken, {
+        minter: apiBackend,
+        account: account1,
+      });
+
+      await mintSomeUSCToAccount(USCToken, {
+        minter: apiBackend,
+        account: account1,
+      });
 
       const redeemAmount = BigNumber.from(300);
       const mintAmount = BigNumber.from(600);
 
       // Perform the redeem
       await tokenController
-        .connect(owner)
+        .connect(apiBackend)
         .redeemAGC(account1.address, redeemAmount, mintAmount);
 
       const account1USC = await USCToken.balanceOf(account1.address);
-      expect(account1USC.eq(mintAmount.add(initialUSCAmount))).to.be.equal(
+      expect(account1USC.eq(mintAmount.add(defaultMintAmount))).to.be.equal(
         true,
         "account1 USC balance should be correct after redeem"
       );
@@ -40,7 +53,7 @@ describe("Token Controller", function () {
       const account1AGCAfterRedeem = await AGCToken.balanceOf(account1.address);
 
       expect(
-        account1AGCAfterRedeem.eq(initialAGCAmount.sub(redeemAmount))
+        account1AGCAfterRedeem.eq(defaultMintAmount.sub(redeemAmount))
       ).to.be.equal(
         true,
         "account1 AGC balance should be correct after redeem"
@@ -51,23 +64,31 @@ describe("Token Controller", function () {
       const {
         tokenController,
         account1,
-        multisig,
+        multisig: companyAccount,
         AGCToken,
         USCToken,
-        initialAGCAmount,
-        initialUSCAmount,
       } = await loadFixture(phase1Fixture);
+
+      await mintSomeAGCToAccount(AGCToken, {
+        minter: companyAccount,
+        account: account1,
+      });
+
+      await mintSomeUSCToAccount(USCToken, {
+        minter: companyAccount,
+        account: account1,
+      });
 
       const redeemAmount = BigNumber.from(300);
       const mintAmount = BigNumber.from(600);
 
       // Perform the redeem
       await tokenController
-        .connect(multisig)
+        .connect(companyAccount)
         .redeemAGC(account1.address, redeemAmount, mintAmount);
 
       const account1USC = await USCToken.balanceOf(account1.address);
-      expect(account1USC.eq(mintAmount.add(initialUSCAmount))).to.be.equal(
+      expect(account1USC.eq(mintAmount.add(defaultMintAmount))).to.be.equal(
         true,
         "account1 USC balance should be correct after redeem"
       );
@@ -75,7 +96,7 @@ describe("Token Controller", function () {
       const account1AGCAfterRedeem = await AGCToken.balanceOf(account1.address);
 
       expect(
-        account1AGCAfterRedeem.eq(initialAGCAmount.sub(redeemAmount))
+        account1AGCAfterRedeem.eq(defaultMintAmount.sub(redeemAmount))
       ).to.be.equal(
         true,
         "account1 AGC balance should be correct after redeem"
@@ -86,11 +107,20 @@ describe("Token Controller", function () {
       const {
         tokenController,
         account1,
+        owner: apiBackend,
         AGCToken,
         USCToken,
-        initialAGCAmount,
-        initialUSCAmount,
       } = await loadFixture(phase1Fixture);
+
+      await mintSomeAGCToAccount(AGCToken, {
+        minter: apiBackend,
+        account: account1,
+      });
+
+      await mintSomeUSCToAccount(USCToken, {
+        minter: apiBackend,
+        account: account1,
+      });
 
       const redeemAmount = BigNumber.from(300);
       const mintAmount = BigNumber.from(150);
@@ -109,7 +139,7 @@ describe("Token Controller", function () {
 
       const account1AGC = await AGCToken.balanceOf(account1.address);
 
-      expect(account1AGC.eq(initialAGCAmount.add(mintAmount))).to.be.equal(
+      expect(account1AGC.eq(defaultMintAmount.add(mintAmount))).to.be.equal(
         true,
         "account1 AGC balance after redeem should be correct"
       );
@@ -117,7 +147,7 @@ describe("Token Controller", function () {
       const account1USCAfterRedeem = await USCToken.balanceOf(account1.address);
 
       expect(
-        account1USCAfterRedeem.eq(initialUSCAmount.sub(redeemAmount))
+        account1USCAfterRedeem.eq(defaultMintAmount.sub(redeemAmount))
       ).to.be.equal(
         true,
         "account 1 USC balance after redeem should be correct"
@@ -128,9 +158,23 @@ describe("Token Controller", function () {
   describe("Error cases", function () {
     it("should throw error if controller does not have enough usc allowance", async function () {
       // account1 is having 1000 USC
-      const { tokenController, account1, USCToken, owner } = await loadFixture(
-        phase1Fixture
-      );
+      const {
+        tokenController,
+        account1,
+        owner: apiBackend,
+        AGCToken,
+        USCToken,
+      } = await loadFixture(phase1Fixture);
+
+      await mintSomeAGCToAccount(AGCToken, {
+        minter: apiBackend,
+        account: account1,
+      });
+
+      await mintSomeUSCToAccount(USCToken, {
+        minter: apiBackend,
+        account: account1,
+      });
 
       // redeem 1000 USC
       await expect(
@@ -249,11 +293,27 @@ describe("Token Controller", function () {
     });
 
     it("should allow new minter to redeem", async function () {
-      const { tokenController, account1, multisig, account2 } =
-        await loadFixture(phase1Fixture);
+      const {
+        tokenController,
+        account1,
+        multisig: companyAccount,
+        account2,
+        AGCToken,
+        USCToken,
+      } = await loadFixture(phase1Fixture);
+
+      await mintSomeAGCToAccount(AGCToken, {
+        minter: companyAccount,
+        account: account1,
+      });
+
+      await mintSomeUSCToAccount(USCToken, {
+        minter: companyAccount,
+        account: account1,
+      });
 
       await tokenController
-        .connect(multisig)
+        .connect(companyAccount)
         .grantRole(REDEEMER_ROLE, account2.address);
 
       const redeemAmount = BigNumber.from(500);

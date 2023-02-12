@@ -7,8 +7,8 @@ const { loadFixture } = require("@nomicfoundation/hardhat-network-helpers");
 const { expect } = require("chai");
 const { BigNumber } = require("ethers");
 
-const { phase1Fixture } = require("./fixtures_2");
-const { MINTER_ROLE, PAUSER_ROLE } = require("./fixtures_2");
+const { phase1Fixture } = require("./fixtures");
+const { MINTER_ROLE, PAUSER_ROLE } = require("./fixtures");
 
 describe("Upgradable USC token", function () {
   describe("Happy path", function () {
@@ -23,8 +23,7 @@ describe("Upgradable USC token", function () {
     });
 
     it("Should be able to mint", async function () {
-      const { USCToken, account1, multisig, initialUSCAmount } =
-        await loadFixture(phase1Fixture);
+      const { USCToken, account1, multisig } = await loadFixture(phase1Fixture);
 
       const mintAmount = BigNumber.from(1000);
 
@@ -32,7 +31,7 @@ describe("Upgradable USC token", function () {
 
       const account1Balance = await USCToken.balanceOf(account1.address);
 
-      expect(mintAmount.add(initialUSCAmount).eq(account1Balance)).to.equal(
+      expect(mintAmount.eq(account1Balance)).to.equal(
         true,
         "account 1 should receive minted balance"
       );
@@ -118,8 +117,7 @@ describe("Upgradable USC token", function () {
     });
 
     it("succeeds if multisig tries to mint", async function () {
-      const { USCToken, multisig, account1, initialUSCAmount } =
-        await loadFixture(phase1Fixture);
+      const { USCToken, multisig, account1 } = await loadFixture(phase1Fixture);
 
       const mintAmount = BigNumber.from(1000);
 
@@ -128,7 +126,7 @@ describe("Upgradable USC token", function () {
       ).to.eventually.fulfilled;
 
       const account1Balance = await USCToken.balanceOf(account1.address);
-      expect(account1Balance.eq(mintAmount.add(initialUSCAmount))).to.be.equal(
+      expect(account1Balance.eq(mintAmount)).to.be.equal(
         true,
         "mintee should have correct balance"
       );

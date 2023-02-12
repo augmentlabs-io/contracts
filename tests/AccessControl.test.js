@@ -7,8 +7,8 @@ const { loadFixture } = require("@nomicfoundation/hardhat-network-helpers");
 const { expect } = require("chai");
 const { BigNumber } = require("ethers");
 
-const { phase1Fixture, ADMIN_ROLE } = require("./fixtures_2");
-const { MINTER_ROLE } = require("./fixtures_2");
+const { phase1Fixture, ADMIN_ROLE, OPERATOR_ROLE } = require("./fixtures");
+const { MINTER_ROLE } = require("./fixtures");
 
 describe("Access Control", function () {
   describe("Role check", function () {
@@ -77,27 +77,33 @@ describe("Access Control", function () {
   });
 
   describe("role renounce", function () {
-    it("should forbid renounced minter from minting", async function () {
-      const { USCToken, AGCToken, tokenController, multisig, account1 } =
-        await loadFixture(phase1Fixture);
+    it("should forbid renounced operator role from minting", async function () {
+      const {
+        AGCToken,
+        multisig: companyAccount,
+        account1,
+      } = await loadFixture(phase1Fixture);
 
-      await AGCToken.connect(multisig).renounceRole(
-        MINTER_ROLE,
-        multisig.address
+      await AGCToken.connect(companyAccount).renounceRole(
+        OPERATOR_ROLE,
+        companyAccount.address
       );
 
       await expect(
-        AGCToken.connect(multisig).mint(account1.address, BigNumber.from(1000))
+        AGCToken.connect(companyAccount).mint(
+          account1.address,
+          BigNumber.from(1000)
+        )
       ).to.eventually.rejectedWith("AccessControl:");
 
-      const isMultisigAdmin = await AGCToken.hasRole(
+      const isCompanyAccountAdmin = await AGCToken.hasRole(
         ADMIN_ROLE,
-        multisig.address
+        companyAccount.address
       );
 
-      expect(isMultisigAdmin).to.be.equal(
+      expect(isCompanyAccountAdmin).to.be.equal(
         true,
-        "multisig should still be admin"
+        "companyAccount should still be admin"
       );
     });
   });
