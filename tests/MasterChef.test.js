@@ -40,61 +40,6 @@ describe("MasterChef", function () {
     });
   });
 
-  describe("set roi per year", function () {
-    describe("happy path", function () {
-      it("should use initial ROI as min ROI", async function () {
-        const { MasterChef, ROIPerYear } = await loadFixture(phase1Fixture);
-
-        const minROI = await MasterChef.minROIPerYear();
-
-        expect(minROI.eq(ROIPerYear)).to.be.eq(
-          true,
-          "initial ROI should be min ROI"
-        );
-      });
-
-      it("should set new roi successfully", async function () {
-        const { MasterChef, multisig: companyAccount } = await loadFixture(
-          phase1Fixture
-        );
-
-        const newROI = 2000; // 20%
-        await MasterChef.connect(companyAccount).setROIPerYear(newROI);
-
-        const currentROI = await MasterChef.roiPerYear();
-
-        expect(currentROI.eq(BigNumber.from(newROI))).to.be.eq(
-          true,
-          "should set new ROI successfully"
-        );
-      });
-    });
-
-    describe("error cases", function () {
-      it("throws if new ROI is less than min ROI", async function () {
-        const { MasterChef, multisig: companyAccount } = await loadFixture(
-          phase1Fixture
-        );
-
-        const newROI = 500; // 5%
-        await expect(
-          MasterChef.connect(companyAccount).setROIPerYear(newROI)
-        ).to.eventually.rejectedWith(
-          "setROIPerYear: new ROI must not be less than minimum"
-        );
-      });
-
-      it("throws if user tries to update ROI", async function () {
-        const { MasterChef, account1 } = await loadFixture(phase1Fixture);
-
-        const newROI = 2000; // 20%
-        await expect(
-          MasterChef.connect(account1).setROIPerYear(newROI)
-        ).to.eventually.rejectedWith(OWNABLE_MSG);
-      });
-    });
-  });
-
   describe("Staking tests", function () {
     it("should throw if user has not approved yet", async function () {
       const { MasterChef, account1 } = await loadFixture(phase1Fixture);

@@ -28,11 +28,8 @@ contract MasterChef is Initializable, PausableUpgradeable, OwnableUpgradeable, U
     /// @dev The sum of all USC staked in the MasterChef
     uint256 public totalStaked;
 
-    /// @dev the minimum ROI per year
-    uint256 public minROIPerYear;
-
     /// @dev The ROI per year that each user gets for staking USC
-    /// @notice ROI per year can be changed but not less than initial minimum 
+    /// @notice ROI per year is fixed at 10% per year
     uint256 public roiPerYear;
 
     /// @dev mapping to save user staking info by user address
@@ -72,20 +69,7 @@ contract MasterChef is Initializable, PausableUpgradeable, OwnableUpgradeable, U
         __UUPSUpgradeable_init();
 
         uscToken = IERC20MintableUpgradeable(_uscToken);
-        minROIPerYear = _roiPerYear;
         roiPerYear = _roiPerYear;
-    }
-
-    /// @dev Sets the new ROI per year
-    /// @notice the new ROI per year must not be less than the initial ROI to protect the users from any risks
-    function setROIPerYear(uint256 _newROIPerYear) external onlyOwner {
-        require(_newROIPerYear >= minROIPerYear, "setROIPerYear: new ROI must not be less than minimum");
-
-        uint256 oldROIPerYear = roiPerYear;
-
-        roiPerYear = _newROIPerYear;
-
-        emit ROIChanged(oldROIPerYear, _newROIPerYear);
     }
 
     /// @dev Pause the smart contract in case of emergency
