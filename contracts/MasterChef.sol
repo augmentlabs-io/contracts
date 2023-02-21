@@ -108,7 +108,7 @@ contract MasterChef is Initializable, PausableUpgradeable, OwnableUpgradeable, U
         uscToken.safeTransferFrom(msg.sender, address(this), _amount);
 
         user.amount += _amount;
-        totalStaked += totalStaked + _amount;
+        totalStaked += _amount;
 
         emit Deposit(msg.sender, _amount);
     }
