@@ -11,11 +11,21 @@ import "@openzeppelin/hardhat-upgrades";
 import { HardhatUserConfig } from "hardhat/types";
 
 export default <HardhatUserConfig>{
-  solidity: "0.8.9",
-  settings: {
-    optimizer: {
-      enabled: true,
-      runs: 300,
+  solidity: {
+    version: "0.8.9",
+    settings: {
+      optimizer: {
+        enabled: true,
+        runs: 200,
+      },
     },
+  },
+  gasReporter: {
+    enabled: true,
+  },
+  contractSizer: {
+    alphaSort: true,
+    runOnCompile: true,
+    disambiguatePaths: false,
   },
 };

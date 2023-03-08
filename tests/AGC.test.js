@@ -75,18 +75,6 @@ describe("Upgradable AGC token", function () {
       });
     });
 
-    describe("view balance", function () {
-      describe("error cases", function () {
-        it("throws if view balance of zero address", async function () {
-          const { AGCToken } = await loadFixture(phase1Fixture);
-
-          await expect(
-            AGCToken.balanceOf(ZERO_ADDRESS)
-          ).to.eventually.rejectedWith("AGC: can not view zero address");
-        });
-      });
-    });
-
     describe("rebasement", function () {
       describe("happy case", function () {
         it("should increases all user balances if ratio > 1", async function () {
@@ -120,7 +108,7 @@ describe("Upgradable AGC token", function () {
           const dividend = 3;
           const divisor = 2;
 
-          // Ratio is 0.5
+          // Ratio is 1.5
           await AGCToken.connect(companyAccount).performRebasement(
             dividend,
             divisor,
@@ -558,7 +546,7 @@ describe("Upgradable AGC token", function () {
 
           await expect(
             AGCToken.connect(companyAccount).mint(account1.address, 0)
-          ).to.eventually.rejectedWith("AGC: cannot mint zero token");
+          ).to.eventually.rejectedWith("mint: cannot mint zero token");
         });
       });
     });
@@ -965,161 +953,119 @@ describe("Upgradable AGC token", function () {
       });
     });
 
-    describe("deductFrom", function () {
+    describe("transferFrom", function () {
       describe("happy path", function () {
-        it("should decrease user balance and increase company balance", async function () {
+        it("can transfer from account 1 to account 2 successfully", async function () {
           const {
             AGCToken,
-            owner: apiBackend,
-            multisig: companyAccount,
             account1,
-            initialCompanyAGCAmount,
+            account2,
+            multisig: companyAccount,
           } = await loadFixture(phase1Fixture);
 
-          const deductAmount = BigNumber.from(200);
+          const totalSupplyBefore = await AGCToken.totalSupply();
 
-          // make sure account 1 has AGC tokens to deduct
+          const mintAmount = BigNumber.from(1000);
+          const transferAmount = BigNumber.from(300);
+
           await mintSomeAGCToAccount(AGCToken, {
-            minter: apiBackend,
+            minter: companyAccount,
             account: account1,
+            mintAmount,
           });
 
-          await AGCToken.connect(apiBackend).deductFrom(
-            account1.address,
-            deductAmount
+          const account2BalanceBeforeTransfer = await AGCToken.balanceOf(
+            account2.address
+          );
+          expect(account2BalanceBeforeTransfer.eq(BigNumber.from(0))).to.be.eq(
+            true,
+            "account 2 should not have any balance"
+          );
+
+          await expect(
+            AGCToken.transferFrom(
+              account1.address,
+              account2.address,
+              transferAmount
+            )
+          ).to.eventually.fulfilled;
+
+          const account2BalanceAfterTransfer = await AGCToken.balanceOf(
+            account2.address
+          );
+
+          expect(account2BalanceAfterTransfer.eq(transferAmount)).to.be.eq(
+            true,
+            "account 2 should receive transferred amount"
           );
 
           const account1Balance = await AGCToken.balanceOf(account1.address);
-          expect(
-            account1Balance.eq(defaultMintAmount.sub(deductAmount))
-          ).to.be.eq(true, "user should have AGC balance deducted");
 
-          const companyAccountBalance = await AGCToken.balanceOf(
-            companyAccount.address
+          expect(account1Balance.eq(mintAmount.sub(transferAmount))).to.be.eq(
+            true,
+            "account 1 should have balance deducted"
           );
 
+          const totalSupplyAfter = await AGCToken.totalSupply();
+
           expect(
-            companyAccountBalance.eq(initialCompanyAGCAmount.add(deductAmount))
-          ).to.be.equal(true, "company should receive deducted amount");
+            totalSupplyBefore.eq(totalSupplyAfter.sub(mintAmount))
+          ).to.be.eq(true, "total supply must be unchanged");
         });
       });
 
       describe("error cases", function () {
-        it("throws if contract is paused", async function () {
-          const {
-            AGCToken,
-            owner: apiBackend,
-            account1,
-            multisig: companyAccount,
-          } = await loadFixture(phase1Fixture);
-
-          await AGCToken.connect(companyAccount).pause();
-
-          await expect(
-            AGCToken.connect(apiBackend).mint(account1.address, 1000)
-          ).to.eventually.rejectedWith(PAUSED_MSG);
-        });
-
-        it("throws if deduct from company address", async function () {
-          const {
-            AGCToken,
-            owner: apiBackend,
-            multisig: companyAccount,
-          } = await loadFixture(phase1Fixture);
-
-          await expect(
-            AGCToken.connect(apiBackend).deductFrom(
-              companyAccount.address,
-              1000
-            )
-          ).to.eventually.rejectedWith(
-            "deductFrom: source address can not be company address"
-          );
-        });
-
-        it("throws if deduct zero address", async function () {
-          const { AGCToken, owner: apiBackend } = await loadFixture(
-            phase1Fixture
-          );
-
-          await expect(
-            AGCToken.connect(apiBackend).deductFrom(ZERO_ADDRESS, 1000)
-          ).to.eventually.rejectedWith(
-            "deductFrom: source address can not be zero"
-          );
-        });
-
-        it("throws if user has insufficient balance", async function () {
-          const {
-            AGCToken,
-            owner: apiBackend,
-            account1,
-          } = await loadFixture(phase1Fixture);
-
-          await expect(
-            AGCToken.connect(apiBackend).deductFrom(account1.address, 10000)
-          ).to.eventually.rejectedWith("deductFrom: insufficient user balance");
-        });
-
-        it("throws if deduct zero amount", async function () {
-          const {
-            AGCToken,
-            owner: apiBackend,
-            account1,
-          } = await loadFixture(phase1Fixture);
-
-          await expect(
-            AGCToken.connect(apiBackend).deductFrom(account1.address, 0)
-          ).to.eventually.rejectedWith(
-            "deductFrom: cannot transfer zero token"
-          );
-        });
-
-        it("throws if user tries to call deductFrom", async function () {
+        it("throws if normal user tries to transferFrom", async function () {
           const { AGCToken, account1, account2 } = await loadFixture(
             phase1Fixture
           );
 
           await expect(
-            AGCToken.connect(account1).deductFrom(account2.address, 1000)
+            AGCToken.connect(account1).transferFrom(
+              account2.address,
+              account1.address,
+              BigNumber.from(10000)
+            )
           ).to.eventually.rejectedWith(ACCESS_CONTROL_MSG);
         });
-      });
-    });
 
-    describe("transferFrom", function () {
-      it("should revert in all cases", async function () {
-        const {
-          AGCToken,
-          account1,
-          account2,
-          multisig: companyAccount,
-          owner: apiBackend,
-        } = await loadFixture(phase1Fixture);
+        it("throws if account 1 has insufficient balance", async function () {
+          const {
+            AGCToken,
+            account1,
+            account2,
+            multisig: companyAddress,
+          } = await loadFixture(phase1Fixture);
 
-        await expect(
-          AGCToken.connect(account1).transferFrom(
-            account1.address,
-            account2.address,
-            1000
-          )
-        ).to.eventually.rejectedWith("transferFrom is not allowed");
+          await expect(
+            AGCToken.connect(companyAddress).transferFrom(
+              account2.address,
+              account1.address,
+              BigNumber.from(10000)
+            )
+          ).to.eventually.rejectedWith(
+            "ERC20: transfer amount exceeds balance"
+          );
+        });
 
-        await expect(
-          AGCToken.connect(companyAccount).transferFrom(
-            account1.address,
-            account2.address,
-            1000
-          )
-        ).to.eventually.rejectedWith("transferFrom is not allowed");
+        it("throws if agc contract is paused", async function () {
+          const {
+            AGCToken,
+            account1,
+            account2,
+            multisig: companyAddress,
+          } = await loadFixture(phase1Fixture);
 
-        await expect(
-          AGCToken.connect(apiBackend).transferFrom(
-            account1.address,
-            account2.address,
-            1000
-          )
-        ).to.eventually.rejectedWith("transferFrom is not allowed");
+          await AGCToken.connect(companyAddress).pause();
+
+          await expect(
+            AGCToken.connect(companyAddress).transferFrom(
+              account2.address,
+              account1.address,
+              BigNumber.from(10000)
+            )
+          ).to.eventually.rejectedWith(PAUSED_MSG);
+        });
       });
     });
 
@@ -1292,34 +1238,6 @@ describe("Upgradable AGC token", function () {
       ).to.eventually.rejectedWith(ACCESS_CONTROL_MSG);
     });
 
-    it("fails if owner tries to transferFrom other user's balance", async function () {
-      const { AGCToken, multisig, account1 } = await loadFixture(phase1Fixture);
-
-      await expect(
-        AGCToken.connect(multisig).transferFrom(
-          account1.address,
-          multisig.address,
-          BigNumber.from(1000)
-        )
-      ).to.eventually.rejectedWith("transferFrom is not allowed");
-    });
-
-    it("fails if api backend tries to transferFrom owner's balance", async function () {
-      const {
-        AGCToken,
-        owner: apiBackend,
-        multisig: owner,
-      } = await loadFixture(phase1Fixture);
-
-      await expect(
-        AGCToken.connect(apiBackend).transferFrom(
-          owner.address,
-          apiBackend.address,
-          BigNumber.from(1000)
-        )
-      ).to.eventually.rejectedWith("transferFrom is not allowed");
-    });
-
     it("fails if a user tries to transferFrom owner's balance", async function () {
       const {
         AGCToken,
@@ -1333,7 +1251,7 @@ describe("Upgradable AGC token", function () {
           account1.address,
           BigNumber.from(1000)
         )
-      ).to.eventually.rejectedWith("transferFrom is not allowed");
+      ).to.eventually.rejectedWith(ACCESS_CONTROL_MSG);
     });
   });
 });

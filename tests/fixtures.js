@@ -34,6 +34,7 @@ async function phase1Fixture() {
   const _USCToken = await ethers.getContractFactory("USC");
   const _TokenController = await ethers.getContractFactory("TokenController");
   const _MasterChef = await ethers.getContractFactory("MasterChef");
+  const _AGCGovernor = await ethers.getContractFactory("AGCGovernor");
 
   // Deploy AGC Token
   const AGCToken = await upgrades.deployProxy(
