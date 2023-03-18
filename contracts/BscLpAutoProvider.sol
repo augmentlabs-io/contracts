@@ -141,6 +141,9 @@ contract BscLpAutoProvider is
 
         require(_amount > 0, "provideLiquidity: bad amount");
 
+        // calculate slippage protection amount over ideal ratio
+        uint256 minOut = calculateAmountOutMinimum(_amount / 2);
+
         // Transfers user's token to this contract
         IERC20(_tokenAddress).safeTransferFrom(
             msg.sender,
@@ -149,11 +152,7 @@ contract BscLpAutoProvider is
         );
 
         // Calls PCS Zapin contract to perform the swap-and-add-liquidity flow
-        _performZapIn(
-            _tokenAddress,
-            _amount,
-            calculateAmountOutMinimum(_amount)
-        );
+        _performZapIn(_tokenAddress, _amount, minOut);
 
         emit LiquidityProvided(
             msg.sender,
