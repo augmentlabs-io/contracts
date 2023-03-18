@@ -9,6 +9,7 @@
     "mark-callable-contracts": "off",
     "compiler-version": ["error", "^0.8.0"],
     "reason-string": ["off"],
+    "no-global-import": ["off"],
     "func-visibility": ["warn", { "ignoreConstructors": true }]
   }
 }
