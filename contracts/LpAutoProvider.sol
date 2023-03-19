@@ -48,6 +48,28 @@ contract LpAutoProvider is
     /// @dev percentage of loss acceptance when performing a swap
     uint24 public slippageTolerance;
 
+    event CompanyTokenChanged(
+        uint256 indexed oldTokenId,
+        uint256 indexed newTokenId,
+        uint24 oldFeeTier,
+        uint24 newFeeTier
+    );
+
+    event LiquidityProvided(
+        address indexed user,
+        uint256 liquidity,
+        uint256 uscAmount,
+        uint256 usdtAmount
+    );
+
+    event FeeCollected(uint256 uscAmount, uint256 usdtAmount);
+
+    event LiquidityWithdrawn(
+        uint256 liquidity,
+        uint256 uscAmount,
+        uint256 usdtAmount
+    );
+
     /// @custom:oz-upgrades-unsafe-allow constructor
     constructor() {
         _disableInitializers();
@@ -59,7 +81,9 @@ contract LpAutoProvider is
         address _uscAddress,
         uint24 _feeTier,
         uint256 _tokenId,
-        address _timelockAddress
+        address _timelockAddress,
+        address _nftPositionManager,
+        address _routerAddress
     ) external initializer {
         require(
             _ownerAddress != address(0),
@@ -95,9 +119,9 @@ contract LpAutoProvider is
         companyTokenId = _tokenId;
 
         nonfungiblePositionManager = INonfungiblePositionManager(
-            0xC36442b4a4522E871399CD717aBDD847Ab11FE88
+            _nftPositionManager
         );
-        swapRouter = ISwapRouter(0xE592427A0AEce92De3Edee1F18E0157C05861564);
+        swapRouter = ISwapRouter(_routerAddress);
         slippageTolerance = 50; // 0.5%
     }
 
@@ -114,7 +138,7 @@ contract LpAutoProvider is
     /// @dev Set new slippage tolerance if the pool is having a high price fluctuation
     function setSlippageTolerance(
         uint24 _newPercentage
-    ) external onlyRole(OPERATOR_ROLE) whenNotPaused {
+    ) external whenNotPaused onlyRole(OPERATOR_ROLE) {
         require(
             _newPercentage >= 0 && _newPercentage <= 500,
             "slippageTolerance: must be between 0% and 5%"
@@ -123,32 +147,34 @@ contract LpAutoProvider is
         slippageTolerance = _newPercentage;
     }
 
-    function setCompanyTokenId(
-        uint256 _newTokenId
-    ) external onlyRole(OPERATOR_ROLE) whenNotPaused {
+    /// @notice sets new company nft token and the fee tier associated
+    /// @dev the fee must be from 0.01% - 1%
+    function setCompanyToken(
+        uint256 _newTokenId,
+        uint24 _newFeeTier
+    ) external whenNotPaused onlyRole(OPERATOR_ROLE) {
         require(
-            _newTokenId > companyTokenId,
-            "companyTokenId: must be larger than previous id"
+            _newTokenId != companyTokenId,
+            "companyTokenId: must be different from previous id"
         );
+
+        require(
+            _newFeeTier >= 100 && _newFeeTier <= 10000,
+            "setFeeTier: fee must be from 0.01% to 1%"
+        );
+
+        uint256 previousTokenId = companyTokenId;
+        uint24 previousFeeTier = feeTier;
 
         companyTokenId = _newTokenId;
-    }
-
-    /// @notice set new fee tier in case we decide to provide liquidity to a different position with different fee
-    /// @dev the fee must be from 0.01% - 1%
-    function setFeeTier(
-        uint24 _newFeeTier
-    ) external onlyRole(OPERATOR_ROLE) whenNotPaused {
-        require(
-            _newFeeTier >= 100,
-            "setFeeTier: fee must be equal or larger than 0.01%"
-        );
-        require(
-            _newFeeTier <= 10000,
-            "setFeeTier: fee must be less or equal to 1%"
-        );
-
         feeTier = _newFeeTier;
+
+        emit CompanyTokenChanged(
+            previousTokenId,
+            companyTokenId,
+            previousFeeTier,
+            feeTier
+        );
     }
 
     /// @dev swaps and add liquidity using contract's USC balance
@@ -191,6 +217,8 @@ contract LpAutoProvider is
             depositUSCAmount,
             swappedUSDT
         );
+
+        emit LiquidityProvided(msg.sender, liquidity, amount0, amount1);
     }
 
     /// @dev swaps and add liquidity using contract's USDT balance
@@ -235,6 +263,8 @@ contract LpAutoProvider is
             swappedUSC,
             depositUSDTAmount
         );
+
+        emit LiquidityProvided(msg.sender, liquidity, amount0, amount1);
     }
 
     /// @notice Collect all fees and transfer to the company wallet address
@@ -256,6 +286,8 @@ contract LpAutoProvider is
 
         // send collected feed back to owner
         _sendToOwner(amount0, amount1);
+
+        emit FeeCollected(amount0, amount1);
     }
 
     /// @notice Withdraws all USDT and USC token to company address
@@ -284,6 +316,8 @@ contract LpAutoProvider is
 
         //send liquidity back to owner
         _sendToOwner(amount0, amount1);
+
+        emit LiquidityWithdrawn(_withdrawAmount, amount0, amount1);
     }
 
     /// @notice callback to accept ERC721 tokens.
@@ -322,7 +356,7 @@ contract LpAutoProvider is
             .increaseLiquidity(params);
     }
 
-    /// @dev swap 50% of all available USC for USDT
+    /// @dev swap an amount USC for USDT
     /// @param uscAmount the amount of USC to swap for USDT
     function swapUSCForUSDT(
         uint256 uscAmount

@@ -1,4 +1,5 @@
 const { BigNumber } = require("ethers");
+const { deployMockContract } = require("@ethereum-waffle/mock-contract");
 const { ethers, upgrades } = require("hardhat");
 
 const MINTER_ROLE = ethers.utils.keccak256(Buffer.from("MINTER_ROLE"));
@@ -11,6 +12,7 @@ const ZERO_ADDRESS = ethers.constants.AddressZero;
 const SECONDS_A_YEAR = 365 * 24 * 60 * 60;
 
 const PAUSED_MSG = "Pausable: paused";
+const SAFE_TRANSFER_MSG = "STF";
 const OWNABLE_MSG = "Ownable: caller is not the owner";
 const ACCESS_CONTROL_MSG = "AccessControl:";
 
@@ -140,33 +142,85 @@ async function phase1Fixture() {
   };
 }
 
-async function biddingFixture() {
+async function lpAutoProviderFixture() {
   const accounts = await ethers.getSigners();
-  const ownerAccount = accounts[0];
-  const _BidController = await ethers.getContractFactory("BidController");
-  const initialPrice = ethers.utils.formatUnits(30000, "ether");
+  const tokenId = 12345;
+  const feeTier = 100; // 0.01%;
+  const [deployerAccount, timelockAccount, ownerAccount, userAccount] =
+    accounts;
 
-  const BidController = await upgrades.deployProxy(
-    _BidController,
-    [initialPrice],
+  const nftPositionManagerAddress =
+    "0xC36442b4a4522E871399CD717aBDD847Ab11FE88";
+
+  const routerAddress = "0xE592427A0AEce92De3Edee1F18E0157C05861564";
+
+  const _USCToken = await ethers.getContractFactory("USC");
+  const _USDTToken = await ethers.getContractFactory("USC");
+  const _lpAutoProvider = await ethers.getContractFactory("LpAutoProvider");
+
+  const _NFTManager = require("../artifacts/contracts/INonfungiblePositionManager.sol/INonfungiblePositionManager.json");
+  const _UniswapRouter = require("../artifacts/@uniswap/v3-periphery/contracts/interfaces/ISwapRouter.sol/ISwapRouter.json");
+
+  const mockNftManager = await deployMockContract(
+    deployerAccount,
+    _NFTManager.abi
+  );
+
+  const mockRouter = await deployMockContract(
+    deployerAccount,
+    _UniswapRouter.abi
+  );
+
+  const USCToken = await upgrades.deployProxy(_USCToken, [], {
+    initializer: "initialize",
+    kind: "uups",
+  });
+
+  await USCToken.deployed();
+
+  const USDTToken = await upgrades.deployProxy(_USDTToken, [], {
+    initializer: "initialize",
+    kind: "uups",
+  });
+
+  await USDTToken.deployed();
+
+  const lpAutoProvider = await upgrades.deployProxy(
+    _lpAutoProvider,
+    [
+      ownerAccount.address,
+      USDTToken.address,
+      USCToken.address,
+      feeTier,
+      tokenId,
+      timelockAccount.address,
+      mockNftManager.address,
+      mockRouter.address,
+    ],
     {
       initializer: "initialize",
       kind: "uups",
     }
   );
 
-  await BidController.deployed();
-
   return {
-    bidController: BidController,
-    owner: ownerAccount,
-    initialPrice,
+    tokenId,
+    ownerAccount,
+    deployerAccount,
+    userAccount,
+    timelockAccount,
+    lpAutoProvider,
+    USCToken,
+    USDTToken,
+    feeTier,
+    NftManager: mockNftManager,
+    SwapRouter: mockRouter,
   };
 }
 
 module.exports = {
   phase1Fixture,
-  biddingFixture,
+  lpAutoProviderFixture,
   MINTER_ROLE,
   ADMIN_ROLE,
   PAUSER_ROLE,
@@ -177,6 +231,7 @@ module.exports = {
   SECONDS_A_YEAR,
   ZERO_ADDRESS,
   PAUSED_MSG,
+  SAFE_TRANSFER_MSG,
   ACCESS_CONTROL_MSG,
   OWNABLE_MSG,
 };

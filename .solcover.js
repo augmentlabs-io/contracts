@@ -1,3 +1,3 @@
 module.exports = {
-  modifierWhitelist: ["nonReentrant", "initializer"],
+  modifierWhitelist: ["nonReentrant", "initializer", "onERC721Received"],
 };
