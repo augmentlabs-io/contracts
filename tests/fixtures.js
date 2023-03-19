@@ -142,6 +142,75 @@ async function phase1Fixture() {
   };
 }
 
+async function bscLpAutoProviderFixture() {
+  const accounts = await ethers.getSigners();
+  const [deployerAccount, timelockAccount, ownerAccount, userAccount] =
+    accounts;
+
+  const _USCToken = await ethers.getContractFactory("USC");
+  const _LpToken = await ethers.getContractFactory("USC");
+  const _USDTToken = await ethers.getContractFactory("USC");
+  const _BscLpAutoProvider = await ethers.getContractFactory(
+    "BscLpAutoProvider"
+  );
+
+  const _PancakeswapZapV1 = require("../artifacts/contracts/interfaces/IPancakeZapV1.sol/IPancakeZapV1.json");
+
+  const factoryAddress = "0xcA143Ce32Fe78f1f7019d7d551a6402fC5350c73";
+  const routerAddress = "0x10ED43C718714eb63d5aA57B78B54704E256024E";
+  const zapAddress = "0xD4c4a7C55c9f7B3c48bafb6E8643Ba79F42418dF";
+
+  const USCToken = await upgrades.deployProxy(_USCToken, [], {
+    initializer: "initialize",
+    kind: "uups",
+  });
+
+  await USCToken.deployed();
+
+  const USDTToken = await upgrades.deployProxy(_USDTToken, [], {
+    initializer: "initialize",
+    kind: "uups",
+  });
+
+  await USDTToken.deployed();
+
+  const PcsZap = await deployMockContract(
+    deployerAccount,
+    _PancakeswapZapV1.abi
+  );
+
+  const LpToken = await upgrades.deployProxy(_LpToken, [], {
+    initializer: "initialize",
+    kind: "uups",
+  });
+
+  const BscLpAutoProvider = await upgrades.deployProxy(
+    _BscLpAutoProvider,
+    [
+      ownerAccount.address,
+      timelockAccount.address,
+      LpToken.address,
+      PcsZap.address,
+    ],
+    {
+      initializer: "initialize",
+      kind: "uups",
+    }
+  );
+
+  return {
+    LpToken,
+    USCToken,
+    USDTToken,
+    PcsZap,
+    timelockAccount,
+    deployerAccount,
+    ownerAccount,
+    userAccount,
+    BscLpAutoProvider,
+  };
+}
+
 async function lpAutoProviderFixture() {
   const accounts = await ethers.getSigners();
   const tokenId = 12345;
@@ -221,6 +290,7 @@ async function lpAutoProviderFixture() {
 module.exports = {
   phase1Fixture,
   lpAutoProviderFixture,
+  bscLpAutoProviderFixture,
   MINTER_ROLE,
   ADMIN_ROLE,
   PAUSER_ROLE,
