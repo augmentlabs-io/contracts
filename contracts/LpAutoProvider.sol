@@ -341,6 +341,18 @@ contract LpAutoProvider is
         internal
         returns (uint128 liquidity, uint256 amountUSC, uint256 amountUSDT)
     {
+        uint256 amount0;
+        uint256 amount1;
+
+        bool isUSCToken0 = isToken0(uscAddress);
+        if (isUSCToken0) {
+            amount0 = amountAddUSC;
+            amount1 = amountAddUSDT;
+        } else {
+            amount0 = amountAddUSDT;
+            amount1 = amountAddUSC;
+        }
+
         INonfungiblePositionManager.IncreaseLiquidityParams
             memory params = INonfungiblePositionManager
                 .IncreaseLiquidityParams({
@@ -429,5 +441,13 @@ contract LpAutoProvider is
         uint256 amountOut
     ) internal view returns (uint256) {
         return (amountOut * (10000 - slippageTolerance)) / 10000;
+    }
+
+    /// @notice get position info using nft manager
+    function isToken0(address _checkAddress) internal view returns (bool) {
+        (, , address token0, , , , , , , , , ) = nonfungiblePositionManager
+            .positions(companyTokenId);
+
+        return token0 == _checkAddress;
     }
 }
