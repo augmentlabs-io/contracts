@@ -357,8 +357,8 @@ contract LpAutoProvider is
             memory params = INonfungiblePositionManager
                 .IncreaseLiquidityParams({
                     tokenId: companyTokenId,
-                    amount0Desired: amountAddUSC,
-                    amount1Desired: amountAddUSDT,
+                    amount0Desired: amount0,
+                    amount1Desired: amount1,
                     amount0Min: 0,
                     amount1Min: 0,
                     deadline: block.timestamp
