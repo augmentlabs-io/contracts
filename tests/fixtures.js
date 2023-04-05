@@ -4,6 +4,7 @@ const { ethers, upgrades } = require("hardhat");
 
 const MINTER_ROLE = ethers.utils.keccak256(Buffer.from("MINTER_ROLE"));
 const UPGRADER_ROLE = ethers.utils.keccak256(Buffer.from("UPGRADER_ROLE"));
+const WITHDRAWER_ROLE = ethers.utils.keccak256(Buffer.from("WITHDRAWER_ROLE"));
 const PAUSER_ROLE = ethers.utils.keccak256(Buffer.from("PAUSER_ROLE"));
 const REDEEMER_ROLE = ethers.utils.keccak256(Buffer.from("REDEEMER_ROLE"));
 const OPERATOR_ROLE = ethers.utils.keccak256(Buffer.from("OPERATOR_ROLE"));
@@ -296,6 +297,7 @@ module.exports = {
   PAUSER_ROLE,
   UPGRADER_ROLE,
   REDEEMER_ROLE,
+  WITHDRAWER_ROLE,
   OPERATOR_ROLE,
   MAX_UINT_256,
   SECONDS_A_YEAR,

@@ -9,11 +9,11 @@ const { BigNumber } = require("ethers");
 
 const {} = require("./helpers");
 const {
-  SAFE_TRANSFER_MSG,
   PAUSED_MSG,
   ACCESS_CONTROL_MSG,
   bscLpAutoProviderFixture,
   ZERO_ADDRESS,
+  WITHDRAWER_ROLE,
 } = require("./fixtures");
 
 describe("BscLpAutoProvider", function () {
@@ -298,4 +298,26 @@ describe("BscLpAutoProvider", function () {
       });
     });
   });
+
+  describe('grant role', function () {
+    describe('happy path', function () {
+      it('should allow owner to grant role', async function () {
+        const { BscLpAutoProvider, ownerAccount, userAccount } = await loadFixture(bscLpAutoProviderFixture);
+
+        await expect(BscLpAutoProvider.connect(ownerAccount).grantRole(WITHDRAWER_ROLE, userAccount.address))
+          .to.eventually.fulfilled;
+
+        await expect(BscLpAutoProvider.connect(userAccount).withdrawLpTokens()).to.eventually.rejectedWith("withdrawLpTokens: withdraw zero amount")
+      });
+    });
+
+    describe('error cases', function () {
+      it('throws if user tries to grant role', async function () {
+        const { BscLpAutoProvider, userAccount } = await loadFixture(bscLpAutoProviderFixture);
+
+        await expect(BscLpAutoProvider.connect(userAccount).grantRole(WITHDRAWER_ROLE, userAccount.address))
+          .to.eventually.rejectedWith(ACCESS_CONTROL_MSG);
+      });
+    });
+  })
 });

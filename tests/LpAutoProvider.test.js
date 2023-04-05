@@ -13,6 +13,7 @@ const {
   SAFE_TRANSFER_MSG,
   PAUSED_MSG,
   ACCESS_CONTROL_MSG,
+  ZERO_ADDRESS,
 } = require("./fixtures");
 
 describe("LpAutoProvider", function () {
@@ -51,6 +52,7 @@ describe("LpAutoProvider", function () {
           userAccount,
           NftManager,
           SwapRouter,
+          USCToken,
         } = await loadFixture(lpAutoProviderFixture);
 
         const swapAmount = BigNumber.from(1000);
@@ -67,6 +69,20 @@ describe("LpAutoProvider", function () {
 
         await SwapRouter.mock.exactInputSingle.returns(500);
         await NftManager.mock.increaseLiquidity.returns(1000, 500, 500);
+        await NftManager.mock.positions.returns(
+          0,
+          ZERO_ADDRESS,
+          USDTToken.address,
+          USCToken.address,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0
+        );
 
         await expect(
           lpAutoProvider.connect(userAccount).swapAndAddUSDT(swapAmount)
@@ -76,13 +92,8 @@ describe("LpAutoProvider", function () {
 
     describe("error cases", function () {
       it("throws if insufficient token amount", async function () {
-        const {
-          lpAutoProvider,
-          deployerAccount,
-          USDTToken,
-          userAccount,
-          SwapRouter,
-        } = await loadFixture(lpAutoProviderFixture);
+        const { lpAutoProvider, deployerAccount, USDTToken, userAccount } =
+          await loadFixture(lpAutoProviderFixture);
 
         const swapAmount = BigNumber.from(1000);
 
@@ -157,6 +168,7 @@ describe("LpAutoProvider", function () {
           userAccount,
           NftManager,
           SwapRouter,
+          USCToken,
         } = await loadFixture(lpAutoProviderFixture);
 
         const swapAmount = BigNumber.from(1000);
@@ -181,6 +193,20 @@ describe("LpAutoProvider", function () {
 
         await SwapRouter.mock.exactInputSingle.returns(500);
         await NftManager.mock.increaseLiquidity.returns(1000, 500, 500);
+        await NftManager.mock.positions.returns(
+          0,
+          ZERO_ADDRESS,
+          USDTToken.address,
+          USCToken.address,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0
+        );
 
         await expect(
           lpAutoProvider.connect(userAccount).swapAndAddUSDT(swapAmount)
@@ -199,6 +225,7 @@ describe("LpAutoProvider", function () {
           userAccount,
           NftManager,
           SwapRouter,
+          USDTToken,
         } = await loadFixture(lpAutoProviderFixture);
 
         const swapAmount = BigNumber.from(1000);
@@ -215,6 +242,20 @@ describe("LpAutoProvider", function () {
 
         await SwapRouter.mock.exactInputSingle.returns(500);
         await NftManager.mock.increaseLiquidity.returns(1000, 500, 500);
+        await NftManager.mock.positions.returns(
+          0,
+          ZERO_ADDRESS,
+          USDTToken.address,
+          USCToken.address,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0
+        );
 
         await expect(
           lpAutoProvider.connect(userAccount).swapAndAddUSC(swapAmount)
@@ -300,6 +341,7 @@ describe("LpAutoProvider", function () {
           userAccount,
           NftManager,
           SwapRouter,
+          USDTToken,
         } = await loadFixture(lpAutoProviderFixture);
 
         const swapAmount = BigNumber.from(1000);
@@ -324,6 +366,20 @@ describe("LpAutoProvider", function () {
 
         await SwapRouter.mock.exactInputSingle.returns(500);
         await NftManager.mock.increaseLiquidity.returns(1000, 500, 500);
+        await NftManager.mock.positions.returns(
+          0,
+          ZERO_ADDRESS,
+          USDTToken.address,
+          USCToken.address,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0
+        );
 
         await expect(
           lpAutoProvider.connect(userAccount).swapAndAddUSC(swapAmount)
