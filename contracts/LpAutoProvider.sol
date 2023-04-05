@@ -373,7 +373,8 @@ contract LpAutoProvider is
     function swapUSCForUSDT(
         uint256 uscAmount
     ) internal returns (uint256 amountOut) {
-        uint256 amountOutMinimum = calculateAmountOutMinimum(uscAmount);
+        uint256 amountUsdtMinimum = calculateAmountOutMinimum(uscAmount) /
+            (10 ** 12);
 
         TransferHelper.safeApprove(uscAddress, address(swapRouter), uscAmount);
 
@@ -385,7 +386,7 @@ contract LpAutoProvider is
                 recipient: address(this),
                 deadline: block.timestamp,
                 amountIn: uscAmount,
-                amountOutMinimum: amountOutMinimum,
+                amountOutMinimum: amountUsdtMinimum,
                 sqrtPriceLimitX96: 0 // swap exact input amount
             });
 
@@ -399,7 +400,8 @@ contract LpAutoProvider is
     function swapUSDTForUSC(
         uint256 usdtAmount
     ) internal returns (uint256 amountOut) {
-        uint256 amountOutMinimum = calculateAmountOutMinimum(usdtAmount);
+        uint256 amountUscMinimum = calculateAmountOutMinimum(usdtAmount) *
+            (10 ** 12);
 
         TransferHelper.safeApprove(
             usdtAddress,
@@ -415,7 +417,7 @@ contract LpAutoProvider is
                 recipient: address(this),
                 deadline: block.timestamp,
                 amountIn: usdtAmount,
-                amountOutMinimum: amountOutMinimum,
+                amountOutMinimum: amountUscMinimum,
                 sqrtPriceLimitX96: 0 // swap exact input amount
             });
 
