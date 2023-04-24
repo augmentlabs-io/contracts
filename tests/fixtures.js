@@ -16,6 +16,7 @@ const PAUSED_MSG = "Pausable: paused";
 const SAFE_TRANSFER_MSG = "STF";
 const OWNABLE_MSG = "Ownable: caller is not the owner";
 const ACCESS_CONTROL_MSG = "AccessControl:";
+const SLIPPAGE_MSG = "provideLiquidity: slippage protection";
 
 const ADMIN_ROLE =
   "0x0000000000000000000000000000000000000000000000000000000000000000";
@@ -143,7 +144,7 @@ async function phase1Fixture() {
   };
 }
 
-async function bscLpAutoProviderFixture() {
+async function v2LpAutoProviderFixture() {
   const accounts = await ethers.getSigners();
   const [deployerAccount, timelockAccount, ownerAccount, userAccount] =
     accounts;
@@ -152,14 +153,8 @@ async function bscLpAutoProviderFixture() {
   const _LpToken = await ethers.getContractFactory("USC");
   const _USDTToken = await ethers.getContractFactory("USC");
   const _BscLpAutoProvider = await ethers.getContractFactory(
-    "BscLpAutoProvider"
+    "LpAutoProviderV2"
   );
-
-  const _PancakeswapZapV1 = require("../artifacts/contracts/interfaces/IPancakeZapV1.sol/IPancakeZapV1.json");
-
-  const factoryAddress = "0xcA143Ce32Fe78f1f7019d7d551a6402fC5350c73";
-  const routerAddress = "0x10ED43C718714eb63d5aA57B78B54704E256024E";
-  const zapAddress = "0xD4c4a7C55c9f7B3c48bafb6E8643Ba79F42418dF";
 
   const USCToken = await upgrades.deployProxy(_USCToken, [], {
     initializer: "initialize",
@@ -175,23 +170,26 @@ async function bscLpAutoProviderFixture() {
 
   await USDTToken.deployed();
 
-  const PcsZap = await deployMockContract(
+  const IAugmentPair = require("../artifacts/contracts/interfaces/IAugmentPair.sol/IAugmentPair.json");
+  const IAugmentRouter01 = require("../artifacts/contracts/interfaces/IAugmentRouter01.sol/IAugmentRouter01.json");
+
+  const augmentPair = await deployMockContract(
     deployerAccount,
-    _PancakeswapZapV1.abi
+    IAugmentPair.abi
   );
 
-  const LpToken = await upgrades.deployProxy(_LpToken, [], {
-    initializer: "initialize",
-    kind: "uups",
-  });
+  const augmentRouter = await deployMockContract(
+    deployerAccount,
+    IAugmentRouter01.abi
+  );
 
-  const BscLpAutoProvider = await upgrades.deployProxy(
+  const LpAutoProviderV2 = await upgrades.deployProxy(
     _BscLpAutoProvider,
     [
       ownerAccount.address,
       timelockAccount.address,
-      LpToken.address,
-      PcsZap.address,
+      augmentPair.address,
+      augmentRouter.address,
     ],
     {
       initializer: "initialize",
@@ -200,15 +198,15 @@ async function bscLpAutoProviderFixture() {
   );
 
   return {
-    LpToken,
+    augmentPair,
     USCToken,
     USDTToken,
-    PcsZap,
+    augmentRouter,
     timelockAccount,
     deployerAccount,
     ownerAccount,
     userAccount,
-    BscLpAutoProvider,
+    LpAutoProviderV2,
   };
 }
 
@@ -226,7 +224,7 @@ async function lpAutoProviderFixture() {
 
   const _USCToken = await ethers.getContractFactory("USC");
   const _USDTToken = await ethers.getContractFactory("USC");
-  const _lpAutoProvider = await ethers.getContractFactory("LpAutoProvider");
+  const _lpAutoProvider = await ethers.getContractFactory("LpAutoProviderV3");
 
   const _NFTManager = require("../artifacts/contracts/INonfungiblePositionManager.sol/INonfungiblePositionManager.json");
   const _UniswapRouter = require("../artifacts/@uniswap/v3-periphery/contracts/interfaces/ISwapRouter.sol/ISwapRouter.json");
@@ -291,7 +289,7 @@ async function lpAutoProviderFixture() {
 module.exports = {
   phase1Fixture,
   lpAutoProviderFixture,
-  bscLpAutoProviderFixture,
+  v2LpAutoProviderFixture,
   MINTER_ROLE,
   ADMIN_ROLE,
   PAUSER_ROLE,
@@ -306,4 +304,5 @@ module.exports = {
   SAFE_TRANSFER_MSG,
   ACCESS_CONTROL_MSG,
   OWNABLE_MSG,
+  SLIPPAGE_MSG,
 };

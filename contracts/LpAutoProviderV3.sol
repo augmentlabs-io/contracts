@@ -13,7 +13,7 @@ import "@uniswap/v3-periphery/contracts/libraries/TransferHelper.sol";
 
 import "./INonfungiblePositionManager.sol";
 
-contract LpAutoProvider is
+contract LpAutoProviderV3 is
     Initializable,
     PausableUpgradeable,
     AccessControlUpgradeable,

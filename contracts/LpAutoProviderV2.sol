@@ -6,29 +6,25 @@ import "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
 import "@openzeppelin/contracts-upgradeable/proxy/utils/UUPSUpgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/access/AccessControlUpgradeable.sol";
 
-import "@openzeppelin/contracts-upgradeable/token/ERC20/utils/SafeERC20Upgradeable.sol";
-import "@openzeppelin/contracts-upgradeable/token/ERC20/IERC20Upgradeable.sol";
+import "./interfaces/IAugmentRouter01.sol";
+import "./interfaces/IAugmentPair.sol";
 
-import "./interfaces/IPancakeZapV1.sol";
-
-contract BscLpAutoProvider is
+contract LpAutoProviderV2 is
     Initializable,
     PausableUpgradeable,
     AccessControlUpgradeable,
     UUPSUpgradeable
 {
-    using SafeERC20Upgradeable for IERC20Upgradeable;
-
     bytes32 public constant PAUSER_ROLE = keccak256("PAUSER_ROLE");
     bytes32 public constant UPGRADER_ROLE = keccak256("UPGRADER_ROLE");
     bytes32 public constant OPERATOR_ROLE = keccak256("OPERATOR_ROLE");
     bytes32 public constant WITHDRAWER_ROLE = keccak256("WITHDRAWER_ROLE");
 
-    /// @notice Pancakeswap zapV1 contract address
-    IPancakeZapV1 public pancakeswapZap;
+    /// @dev the Augmentlab router
+    IAugmentRouter01 public augmentRouter;
 
-    /// @notice The pair address of PCS
-    address public pairAddress;
+    /// @notice The pair address of USC/USDT pair
+    IAugmentPair public augmentPair;
 
     /// @notice percentage of loss acceptance when performing a swap
     uint24 public slippageTolerance;
@@ -43,7 +39,7 @@ contract BscLpAutoProvider is
         address indexed sender,
         address indexed token,
         address pool,
-        uint256 lpTokensReceived
+        uint256 liquidity
     );
 
     event WithdrawnLpTokens(
@@ -61,7 +57,7 @@ contract BscLpAutoProvider is
         address _ownerAddress,
         address _timelockAddress,
         address _pairAddress,
-        address _zapAddress
+        address _routerAddress
     ) external initializer {
         require(
             _ownerAddress != address(0),
@@ -78,6 +74,11 @@ contract BscLpAutoProvider is
             "initialize: pair address cannot be empty"
         );
 
+        require(
+            _routerAddress != address(0),
+            "initialize: router address cannot be empty"
+        );
+
         __Pausable_init();
         __AccessControl_init();
         __UUPSUpgradeable_init();
@@ -85,15 +86,15 @@ contract BscLpAutoProvider is
         ownerAddress = _ownerAddress;
 
         _grantRole(DEFAULT_ADMIN_ROLE, ownerAddress);
-        _grantRole(UPGRADER_ROLE, ownerAddress);
         _grantRole(OPERATOR_ROLE, ownerAddress);
         _grantRole(PAUSER_ROLE, ownerAddress);
 
+        _grantRole(UPGRADER_ROLE, _timelockAddress);
         _grantRole(WITHDRAWER_ROLE, _timelockAddress);
 
-        pairAddress = _pairAddress;
+        augmentRouter = IAugmentRouter01(_routerAddress);
+        augmentPair = IAugmentPair(_pairAddress);
         timelockAddress = _timelockAddress;
-        pancakeswapZap = IPancakeZapV1(_zapAddress);
 
         slippageTolerance = 50; // 0.5%
     }
@@ -127,59 +128,85 @@ contract BscLpAutoProvider is
         uint256 _amount
     ) external whenNotPaused {
         require(
-            _tokenAddress != address(0),
-            "provideLiquidity: zero token address"
+            _tokenAddress == augmentPair.token0() ||
+                _tokenAddress == augmentPair.token1(),
+            "provideLiquidity: invalid token address"
         );
 
         require(_amount > 0, "provideLiquidity: bad amount");
+        (uint256 reserve0, uint256 reserve1, ) = augmentPair.getReserves();
+
+        bool isToken0 = augmentPair.token0() == _tokenAddress;
+
+        uint256 amountOut;
+
+        address[] memory callPath = new address[](2);
+        callPath[0] = augmentPair.token0();
+        callPath[1] = augmentPair.token1();
+
+        if (isToken0) {
+            amountOut = augmentRouter.getAmountOut(
+                _amount / 2,
+                reserve0,
+                reserve1
+            );
+        } else {
+            amountOut = augmentRouter.getAmountOut(
+                _amount / 2,
+                reserve1,
+                reserve0
+            );
+        }
 
         // calculate slippage protection amount over ideal ratio
-        uint256 minOut = calculateAmountOutMinimum(_amount / 2);
+        uint256 minOut = calculateAmountOutMinimum(amountOut);
 
         // Transfers user's token to this contract
-        IERC20Upgradeable(_tokenAddress).safeTransferFrom(
-            msg.sender,
-            address(this),
-            _amount
-        );
+        augmentPair.transferFrom(msg.sender, address(this), _amount);
 
-        // Calls PCS Zapin contract to perform the swap-and-add-liquidity flow
-        _performZapIn(_tokenAddress, _amount, minOut);
+        uint256 swapped = augmentRouter.swapExactTokensForTokens(
+            _amount / 2, // swap 50% off the user input amount
+            minOut,
+            callPath,
+            address(this),
+            block.timestamp
+        )[1];
+
+        require(swapped >= minOut, "provideLiquidity: slippage protection");
+
+        (, , uint256 liquidity) = augmentRouter.addLiquidity(
+            augmentPair.token0(),
+            augmentPair.token1(),
+            isToken0 ? _amount / 2 : swapped,
+            isToken0 ? swapped : _amount / 2,
+            0,
+            0,
+            address(this),
+            block.timestamp
+        );
 
         emit LiquidityProvided(
             msg.sender,
             _tokenAddress,
-            pairAddress,
-            IERC20Upgradeable(pairAddress).balanceOf(address(this))
+            address(augmentPair),
+            liquidity
         );
     }
 
     /// @notice Transfer all LP tokens to owner address
     /// @dev Only the timelock can perform this operation
     function withdrawLpTokens() external onlyRole(WITHDRAWER_ROLE) {
-        uint256 lpTokenAmount = IERC20Upgradeable(pairAddress).balanceOf(
-            address(this)
-        );
+        uint256 lpTokenAmount = augmentPair.balanceOf(address(this));
 
         require(lpTokenAmount > 0, "withdrawLpTokens: withdraw zero amount");
 
-        IERC20Upgradeable(pairAddress).transfer(ownerAddress, lpTokenAmount);
+        augmentPair.transfer(ownerAddress, lpTokenAmount);
 
-        emit WithdrawnLpTokens(pairAddress, ownerAddress, lpTokenAmount);
-    }
-
-    /// @notice Automatically approves Zap contract to spend the input tokens. Then perform the Zap
-    function _performZapIn(
-        address _tokenAddress,
-        uint256 _amount,
-        uint256 _minOut
-    ) internal {
-        IERC20Upgradeable(_tokenAddress).safeApprove(
-            address(pancakeswapZap),
-            _amount
+        emit WithdrawnLpTokens(
+            address(augmentPair),
+            ownerAddress,
+            lpTokenAmount
         );
-
-        pancakeswapZap.zapInToken(_tokenAddress, _amount, pairAddress, _minOut);
     }
 
     function _authorizeUpgrade(
